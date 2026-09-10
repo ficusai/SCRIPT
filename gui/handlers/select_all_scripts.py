@@ -1,3 +1,8 @@
+# Module note: Select All Scripts Event Handler.
+# Purpose: Checks every item in the script list widget.
+# Plain-language overexplanation for beginners:
+# When the user clicks the "Select All" button above the script list pane, this handler loops through every script file in the list and sets its checkbox state to checked.
+
 from PyQt6.QtCore import Qt
 
 
