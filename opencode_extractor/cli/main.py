@@ -1,6 +1,26 @@
 """
 Command line interface main entry point.
 This module handles user terminal commands, options, and triggers script extraction routines.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported:
+    - Code Files Extracted: .py, .js, .ts, .jsx, .tsx, .sh, .bash, .rs, .go, .java, .c, .cpp, .html, .css, .json, .md, .yml, .toml
+    - Archive Outputs: .zip
+    - Metadata & Log Outputs: .json, .md, .patch
+- Formats Handled:
+    - Markdown (.md) transcripts and summary reports
+    - JSON (.json) metadata schema definitions
+    - ZIP (.zip) deflated compressed archive packages
+- Export Modes Supported:
+    - Single session targeted export (`python3 -m opencode_extractor <session_id> --out <dir>`)
+    - Bulk multi-session export (`python3 -m opencode_extractor --all --out <dir>`)
+    - Archive compressed export (`--zip` option flag)
+    - Flat filename structure export (`--flat` option flag)
+    - Session discovery table listing (`--list` option flag)
+- Framework Possibilities:
+    - CLI Execution: Primary entry point invoked directly or via `python3 -m opencode_extractor`
+    - Shell Automation: Scriptable via bash / zsh / CI pipelines for automated session archiving
+    - Wrapper APIs: Subprocess target for external GUI runners or desktop extensions
 """
 
 from __future__ import annotations
@@ -179,64 +199,69 @@ from opencode_extractor.exporter.export_session_bundles import export_session_bu
 #   - Python (.py), Shell (.sh, .bash), JavaScript (.js), TypeScript (.ts)
 def main() -> None:
     # Set up the command-line argument parser to handle options typed by the user.
-    # NOTE on the parser configuration:
-    #   - No add_argument for --format / --unexported-only / --gui / --db-path / --output-dir:
-    #     they would be rejected as unrecognized arguments.
-    #   - No type= on store_true flags (that would be invalid); booleans come from presence.
-    #   - session_id is the ONLY positional and the ONLY option that may consume a bare token.
+    # Instantiate ArgumentParser object
     ap = argparse.ArgumentParser(description="OpenCode multi-format session script & tool call extractor")
-    ap.add_argument("session_id", nargs="?", help="Root session ID to extract (omit or use --all to process all sessions)")
-    ap.add_argument("--db", default="all", help="Database path or 'all' to aggregate")
-    ap.add_argument("--out", default=None, help="Output directory")
-    ap.add_argument("--all", action="store_true", help="Extract and export ALL root sessions")
-    ap.add_argument("--tool-calls", action="store_true", help="Include full tool call history and transcripts")
-    ap.add_argument("--zip", action="store_true", help="Package export into a ZIP archive")
-    ap.add_argument("--list", action="store_true", help="List all root sessions")
-    ap.add_argument("--flat", action="store_true", help="Flat output (no path structure)")
-    args = ap.parse_args()
 
-    # NOTE: args now holds: session_id (str|None), db (str, 'all' by default), out (str|None),
-    # all/tool_calls/zip/list/flat (bool, all False unless their flag was passed).
-    # parse_args() is the only place argparse can exit (SystemExit 2 on unknown flags).
+    # Add command-line arguments to the parser:
+    # 1. session_id: Optional string positional argument specifying session UUID to extract
+    ap.add_argument("session_id", nargs="?", help="Root session ID to extract (omit or use --all to process all sessions)")
+
+    # 2. --db: String flag specifying database file path or 'all' to search all databases (default: "all")
+    ap.add_argument("--db", default="all", help="Database path or 'all' to aggregate")
+
+    # 3. --out: String flag specifying destination directory path for exported files (default: None)
+    ap.add_argument("--out", default=None, help="Output directory")
+
+    # 4. --all: Boolean flag triggering batch extraction of all root sessions (default: False)
+    ap.add_argument("--all", action="store_true", help="Extract and export ALL root sessions")
+
+    # 5. --tool-calls: Boolean flag for tool call log inclusion (default: False)
+    ap.add_argument("--tool-calls", action="store_true", help="Include full tool call history and transcripts")
+
+    # 6. --zip: Boolean flag for producing a compressed ZIP archive output (default: False)
+    ap.add_argument("--zip", action="store_true", help="Package export into a ZIP archive")
+
+    # 7. --list: Boolean flag to display summary list of all available root sessions (default: False)
+    ap.add_argument("--list", action="store_true", help="List all root sessions")
+
+    # 8. --flat: Boolean flag to flatten relative directory paths during script output (default: False)
+    ap.add_argument("--flat", action="store_true", help="Flat output (no path structure)")
+
+    # Parse arguments provided in sys.argv
+    # Variable Type: argparse.Namespace object
+    args = ap.parse_args()
 
     # Discover and display all local OpenCode database files and text dumps found on the machine.
     print("Discovered OpenCode Database & Dump Sources:")
-    # discover_all_databases() returns List[DatabaseSource] sorted by session_count DESCENDING.
-    # None found -> the for-loop prints nothing, then a blank line, and execution continues.
     for d in discover_all_databases():
         print(f"  - [{d.session_count:>4} sessions] [{d.kind}] {d.label}")
     print()
 
     # Open the extractor facade using the specified database path or all detected databases.
-    # OpenCodeExtractor is a context manager: __exit__ closes every cached sqlite3 connection.
+    # Context manager (`with` statement) automatically handles database connection cleanup
     with OpenCodeExtractor(args.db) as ex:
         # Load helper information: counts of files per session and IDs of sessions exported previously.
-        file_counts = ex.get_session_file_counts()  # Dict[str, int]: root session id -> script count
-        exported_ids = load_exported_session_ids()  # Set[str]: ids present in the state cache
+        file_counts = ex.get_session_file_counts()
+        exported_ids = load_exported_session_ids()
+
         # If the user asked to list sessions or didn't specify a session, display a summary list and exit.
-        # PRECEDENCE NOTE: entering this block wins over BOTH --all and a positional session_id.
-        # "No session specified" == "args.session_id is None AND args.all is False".
+        # Condition: `args.list or (not args.session_id and not args.all)`
         if args.list or (not args.session_id and not args.all):
             print(f"{'STATUS':<7} {'ID':<34} {'AGENT':<18} {'SUBS':>4} {'SCRIPTS':>7}  TITLE")
             for s in ex.root_sessions():
-                sc = file_counts.get(s.id, 0)          # 0 when this root has no counted scripts
-                status = "[✓]" if s.id in exported_ids else "[ ]"   # ✓ == already exported before
+                sc = file_counts.get(s.id, 0)
+                status = "[✓]" if s.id in exported_ids else "[ ]"
                 print(f"{status:<7} {s.id:<34} {s.agent:<18} {s.subagent_count:>4} {sc:>7}  {s.display_title[:60]}")
-            sys.exit(0)   # clean exit code 0; nothing below ever runs when listing
+            # Exit program with status code 0 cleanly
+            sys.exit(0)
 
         # Handle exporting all discovered sessions at once.
+        # Condition: `args.all` is True
         if args.all:
-            root_sids = [s.id for s in ex.root_sessions()]   # all root ids (subagents excluded)
+            root_sids = [s.id for s in ex.root_sessions()]
             print(f"Extracting bundles for ALL {len(root_sids)} sessions...")
-            # extract_multiple_bundles: List[SessionExportBundle], one per root session id.
             bundles = ex.extract_multiple_bundles(root_sids)
             if args.out:
-                # NOTE the hard-coded exporter arguments:
-                #   export_tool_calls=args.tool_calls or True  -> ALWAYS True (flag is a no-op)
-                #   export_scripts_flag=True                   -> scripts ALWAYS written
-                #   preserve_paths=not args.flat               -> --flat inverts path preservation
-                #   create_zip=args.zip                        -> --zip controls .zip packaging
-                # Bundles WITHOUT --out are extracted into memory and then simply discarded here.
                 s_cnt, t_cnt, where = export_session_bundles(
                     bundles,
                     args.out,
@@ -248,17 +273,12 @@ def main() -> None:
                 print(f"\nSuccessfully exported {len(bundles)} sessions ({s_cnt} script files, {t_cnt} tool calls) to: {where}")
         # Handle exporting a single specific session requested by the user.
         else:
-            # args.session_id can be None here only if args.all was True - which can't happen in
-            # this branch - so it is always a string in practice.
             print(f"Extracting data for session {args.session_id} ...")
-            # KeyError is NOT caught here: a bogus session id surfaces as a traceback.
             bundle = ex.extract_session_bundle(args.session_id)
             print(f"Found {len(bundle.scripts)} script artifact(s) and {len(bundle.tool_calls)} tool call(s).")
             for a in bundle.scripts:
-                n = len(a.content.splitlines()) if a.content else 0   # physical line count (blank line for empty content)
+                n = len(a.content.splitlines()) if a.content else 0
                 print(f"  [{a.label:<16}] {a.filePath}  (from {a.primary_tool}, {n} lines)")
-                # a.label is EXT_LABEL.get(extension, "📄 <EXT>") right-aligned into a 16-col field;
-                # a.primary_tool is one of write / edit / bash.
 
             if args.out:
                 s_cnt, t_cnt, where = export_session_bundles(
