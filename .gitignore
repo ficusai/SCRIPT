@@ -188,3 +188,59 @@ env/
 # Line 42 explanation: `Thumbs.db`
 # - What it does: Ignores Windows Explorer thumbnail database file generated automatically when viewing folders containing image files.
 Thumbs.db
+
+# Common GitHub project ignores
+# Python environments (if created locally)
+env/
+.venv/
+venv/
+ENV/
+
+# IDE specific
+*.iml
+*.iws
+*.ipr
+.idea/
+.settings/
+.project
+
+# Documentation build outputs (if docs are built locally)
+docs/_build/
+docs/build/
+
+# Test coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Secrets and credentials (never commit these)
+*.key
+*.pem
+*.p12
+.env.local
+.env.production
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.local/share/Trash/
+*/.Trash/
+*.swp
+*.swo
+*~
