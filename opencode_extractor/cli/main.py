@@ -285,7 +285,7 @@ def main() -> None:
                 s_cnt, t_cnt, where = export_session_bundles(
                     bundles,
                     args.out,
-                    export_tool_calls=args.tool_calls or True,
+                    export_tool_calls=args.tool_calls,
                     export_scripts_flag=True,
                     preserve_paths=not args.flat,
                     create_zip=args.zip,
@@ -304,7 +304,7 @@ def main() -> None:
                 s_cnt, t_cnt, where = export_session_bundles(
                     [bundle],
                     args.out,
-                    export_tool_calls=args.tool_calls or True,
+                    export_tool_calls=args.tool_calls,
                     export_scripts_flag=True,
                     preserve_paths=not args.flat,
                     create_zip=args.zip,
