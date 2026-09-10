@@ -68,6 +68,12 @@ def find_descendants(sessions: Dict[str, SessionInfo], root_id: str) -> List[Ses
         seen.add(pid)
 
         # Search all session records for any session whose parent ID matches the current ID.
+        # (Performance Note: This inner loop is O(N) per stack pop, making the total
+        #  traversal O(N * D) where N = total sessions and D = tree depth. For a flat
+        #  hierarchy (D=1) this is O(N); for deep nesting it degrades. With 100k sessions
+        #  and depth 10, that's 1M comparisons. Consider pre-building a parent_id->children
+        #  index (HashMap<String, Vec<String>>) at session load time to reduce this to
+        #  O(N + E) where E is the number of parent-child edges.)
         for sess in sessions.values():
             if sess.parent_id == pid and sess.id not in seen:
                 out.append(sess)

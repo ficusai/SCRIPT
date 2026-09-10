@@ -115,6 +115,11 @@ def fetch_part_rows(
     #  For generator-based callers, this defeats lazy evaluation. However, the chunked SQL query below requires
     #  indexed access (ids[i:i+200]), so a list is necessary. If session_ids is very large (>50k), consider
     #  increasing the chunk size (currently 200) proportionally to reduce the number of SQL round-trips.)
+    # (Data Architecture Note: This generator yields rows from ALL database sources in source-list order.
+    #  A session_id present in both a SQLite DB and a text dump will yield rows TWICE (once per source).
+    #  The output shape is always (session_id_str, json_data_str_or_None) tuples. The generator does NOT
+    #  validate that session_ids were found in the database — it simply queries and yields whatever matches.
+    #  SQLite NULL data columns yield (sid, None) which downstream json.loads() rejects.)
     ids = list(session_ids)
 
     # Process each database source registered in the system.

@@ -156,6 +156,13 @@ from opencode_extractor.cache.ensure_cache_dir import CACHE_FILE, ensure_cache_d
 #  The function drops version and last_updated fields, so callers cannot detect schema mismatches.
 #  If exported_sessions value is not a dict (e.g. corrupted to a list), downstream code using
 #  set() or 'in' checks may fail with TypeError. Defensive callers should validate the return type.)
+# (Data Architecture Note: Export cache file format is a flat JSON dictionary persisted to disk.
+#  Schema: {"version": int, "last_updated": ISO8601, "exported_sessions": {session_id: {metadata dict}}}
+#  Version field is written but NEVER validated on read — this means schema migrations (v1->v2) are
+#  silently ignored and old cache files become unusable without explicit migration tooling.
+#  The function returns ONLY the exported_sessions inner dict; version and last_updated are dropped.
+#  Concurrency: no file locking is used. Concurrent read-modify-write operations can lose updates
+#  (last writer wins). This is acceptable for single-user CLI tools but problematic for multi-process use.)
 def load_export_cache() -> Dict[str, Dict[str, Any]]:
     # (Line note: Ensure the cache directory exists on disk before attempting to read the cache file.
     #  This creates ~/.local/share/opencode/ (and any missing parent directories) if they do not exist.
