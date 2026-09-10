@@ -2,83 +2,50 @@
 Pattern for detecting inline Python script executions.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import regular expression module re for compiled regex pattern matching
 import re
 
-# A search pattern (regex) that matches inline Python commands written directly in terminal strings (like `python -c "print('hello')"`).
-# Data type: Compiled Regex Pattern Object (re.Pattern)
+# Module Purpose & Overview:
+# Defines a compiled regular expression object (INLINE_PY_RE) used to detect inline Python code execution commands passed directly on the shell command line via `python -c "..."` or `python3 -c '...'`.
 #
-# ============================================================================
-# TOKEN-BY-TOKEN PLAIN-LANGUAGE TRANSLATION
-# ============================================================================
-#   python3?      'python' OR 'python3' (the '3' is optional; 'python2' does NOT match).
-#                 re.I is set, so 'Python', 'PYTHON', 'Python3' all match.
-#   \s+           at least one space/tab.
-#   -c            literal '-c' flag (Python's "execute code string" option). re.I makes '-C' work too.
-#   \s+           at least one space/tab after the flag.
-#   ['\"]         an OPENING quote: single ' or double ".
-#   (.*?)         CAPTURE GROUP 1 = the inline Python code, NON-GREEDY: it stops at the first
-#                 closing quote (verified: `python3 -c "a" "b"` captures only 'a'). re.S lets it
-#                 contain REAL newlines, so 'python3 -c "import os\nprint(os.getcwd())"' works.
-#   ['\"]         the CLOSING quote.
-#   (?:\s+|$)     NON-CAPTURING: either one-or-more whitespace OR absolute end-of-string ('$'
-#                 without re.M = end of the whole string, NOT end of line). This guard prevents
-#                 `...-c 'code'abc` from matching (nothing between quote and 'a' is whitespace,
-#                 and 'a' is not the string end).
+# Variable Type & Flags:
+#   - Name: INLINE_PY_RE
+#   - Type: re.Pattern (Compiled Regular Expression Pattern)
+#   - Flags: re.S | re.I (DOTALL, IGNORECASE)
+#       * re.S (DOTALL): Allows dot '.' to match newlines across multiline inline code blocks.
+#       * re.I (IGNORECASE): Makes 'python' / 'python3' command names and '-c' flag case-insensitive.
 #
-# ============================================================================
-# FLAG EFFECTS (re.S | re.I ONLY - note there is NO re.M here)
-# ============================================================================
-#   re.DOTALL  (re.S): GROUP 1 can span multiple lines -> multiline inline snippets are captured.
-#   re.IGNORECASE: 'python'/'python3' and '-c' flag are case-insensitive.
-#   NO re.M: because of that, the '\s+|$' guard uses $ as STRING-END only. In a multi-line bash
-#            command 'python3 -c "code"\ncd /tmp' the trailing '\s+' still contributes (whitespace
-#            sequence), so the match succeeds via whitespace; the delimiter is at risk only when
-#            the code string is the very end of the string.
+# Token-by-Token Regular Expression Breakdown:
+#   - `python3?` : Matches "python" or "python3" (case-insensitive thanks to re.I).
+#   - `\s+` : One or more whitespace characters.
+#   - `-c` : Literal string "-c" (the Python command-line flag to execute code string).
+#   - `\s+` : One or more whitespace characters.
+#   - `['\"]` : An opening single quote (') or double quote (").
+#   - `(.*?)` : CAPTURE GROUP 1 (Non-greedy match for the inline Python code string).
+#   - `['\"]` : A closing single quote (') or double quote (").
+#   - `(?:\s+|$)` : Non-capturing trailing guard: requires either one or more whitespace characters or the end of string.
 #
-# ============================================================================
-# VERIFIED MATCH EXAMPLES (group1 = captured inline code)
-# ============================================================================
-#   1. python3 -c 'import sys; print(sys.version)'      -> 'import sys; print(sys.version)'
-#   2. python -c "print('hello world')"                 -> "print('hello world')"
-#   3. python3 -c 'from pathlib import Path; print(Path.cwd())'  -> full expression
-#   4. python3 -c "import os\nprint(os.getcwd())"       -> code containing a real newline (re.S)
-#   5. python -c "import json; print(json.dumps({'status': 'ok'}))"  -> inner quotes preserved
-#   6. PYTHON3 -C "x=1"                                 -> case-insensitive interpreter AND flag
-#   7. python3 -c ""                                    -> ('',)  empty code string IS a match
-#   8. python3 -c "a" "b"                               -> ('a',) first-quote wins (non-greedy)
-#   9. python3 -c 'code' extra                          -> matches: trailing whitespace satisfies \s+
+# Capture Group Output:
+#   - Group 1: Inline Python code string (e.g. "import sys; print(sys.version)", "import os; print(os.getcwd())")
 #
-# ============================================================================
-# VERIFIED NON-MATCH EXAMPLES (why each fails)
-# ============================================================================
-#   1. python3 -c x                                     -> no quote after '-c '; regex demands ['\"].
-#   2. bash -c "echo hi"                                -> interpreter must be python/python3.
-#   3. python3 --c "x=1"                                -> after '-c' the regex needs \s+ or the
-#      closing quote; the next char is '-' -> fail at '-c'; no valid later position either.
-#   4. python3 "print(1)"                               -> '-c' flag missing entirely.
-#   5. python3 -c 'code'abc                             -> between the closing quote and 'a' there is
-#      no whitespace and 'a' is not end-of-string -> guard (?:\s+|$) fails.
+# Extraction Threshold Note:
+#   - Captured code strings are processed by parse_bash_artifacts, which requires len(code) > 20 chars to generate a virtual script artifact.
 #
-# ============================================================================
-# BOUNDARY & EDGE CASES
-# ============================================================================
-#   - CONSUMER CONTRACT (parse_bash_artifacts): the captured code must be non-empty AND longer than
-#     20 characters (len(code) > 20) or no artifact is created. Shorter snippets are silently
-#     dropped. When emitted, the artifact is a VIRTUAL file named
-#     f"inline_script_{abs(hash(code)) % 10000}.py" with content = code + "\n",
-#     source_kind = 'bash_inline', extension = 'py'.
-#   - hash() is an int; abs() + % 10000 keeps the name in [0,9999]. Being a virtual artifact, its
-#     filePath never exists on disk (it is exported as the generated name).
-#   - The regex is unanchored: 'echo $((1)) && python3 -c "x"' still matches the python part.
+# Match & Non-Match Examples:
+#   - Match: python3 -c 'import sys; print(sys.version)' -> Group 1: "import sys; print(sys.version)"
+#   - Match: python -c "print('hello world')" -> Group 1: "print('hello world')"
+#   - Non-match: bash -c "echo hi" -> Interpreter is bash, not python.
 #
-# SAMPLE BASH COMMAND STRINGS FOR TESTING REGEX:
-#   - `python3 -c "import os; print(os.listdir('.'))"`
-#   - `python -c "import json; print(json.dumps({'status': 'ok'}))"`
-# EXTRACTED INLINE CODE LANGUAGE:
-#   - Python (.py)
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.constants.inline_py_re import INLINE_PY_RE; m = INLINE_PY_RE.search("python3 -c \"import os; print(os.getcwd())\""); print(m.group(1) if m else None)'
+
+# Constant definition: Compiled regex matching inline Python terminal execution commands
 INLINE_PY_RE = re.compile(
+    # Pattern string: Matches python/python3 interpreter, -c flag, quoted Python code block, and trailing space or line end
     r"""python3?\s+-c\s+['\"](.*?)['\"](?:\s+|$)""",
+    # Flags: DOTALL (re.S), IGNORECASE (re.I)
     re.S | re.I,
 )
