@@ -155,11 +155,25 @@ def build_header_bar(window) -> QHBoxLayout:
     #  Also consider adding a keyboard shortcut (Ctrl+R) for power users.)
     window.refresh_btn = QPushButton("🔄 Refresh")
     from gui.handlers.load_sessions_async import load_sessions_async
+    # (UX Note: The refresh button lacks a visual loading state. When clicked, it becomes disabled but
+    #  shows no animation or spinner. Users may click it multiple times thinking it didn't work.
+    #  Consider showing a spinner or changing text to "Scanning..." during the operation.)
+    # (Keyboard Navigation Note: Pressing Tab moves focus between widgets in DOM order. The refresh button
+    #  is the last widget in the header bar. Consider adding a Ctrl+R shortcut for power users.)
     # Signal Connection: Connect refresh button click signal to restart asynchronous background scanning thread.
     # Event callback: Launches ScanWorker thread via `load_sessions_async(window)`.
     # Manual trigger for tests: `window.refresh_btn.click()` re-scans; verify status label flips to "Scanning...".
     window.refresh_btn.clicked.connect(lambda: load_sessions_async(window))
     header_layout.addWidget(window.refresh_btn)
+
+    # (Accessibility Note: No ARIA-equivalent role or accessible name is set on the header bar layout itself.
+    #  Screen reader users navigating by landmarks may not understand they've reached the application controls.)
+    # (UX Note: Error messages during scanning are displayed in the status footer, not near the control that
+    #  triggered them. If a database scan fails, the user may not immediately associate the error with
+    #  the refresh action. Consider showing a brief toast or inline message near the refresh button.)
+    # (Responsive Layout Note: On window widths below 900px, the header bar widgets may become cramped.
+    #  Consider hiding the search input placeholder text or using an icon-only button approach for the
+    #  refresh button on smaller screens.)
 
     # Line note: Return completed horizontal header layout.
     return header_layout
