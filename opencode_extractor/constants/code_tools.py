@@ -2,39 +2,30 @@
 Action names for tools that write or edit files.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
-# A set data collection of tool action names used by the AI assistant when creating or modifying source code files.
-# Data type: set of strings (Set[str])
+# Module Purpose & Overview:
+# Defines the set of OpenCode tool action names (CODE_TOOLS) that directly create or edit source code files.
 #
-# WHY THESE TWO VALUES (plausibility rationale):
-#   - 'write': the OpenCode tool call whose input carries {"filePath": "...", "content": "..."}.
-#              It CREATES a file or OVERWRITES it completely. It is the primary source of full
-#              script bodies during extraction (extract_scripts stores content verbatim and also
-#              keeps the artifact in the `written` dict used later to backfill 'edit' artifacts).
-#   - 'edit':  the OpenCode tool call whose input carries {"filePath": "...", "oldString": "...",
-#              "newString": "..."}. It PATCHES an existing file. extraction records the diff patch
-#              (from state.metadata.diff, else metadata.filediff.patch, else a synthesized
-#              "--- file\n+++ file\n-old\n+new\n" string), tracks additions/deletions via
-#              new.count("\n") / old.count("\n"), and appends (old, new) pairs to `edits`.
+# Variable Type & Value:
+#   - Name: CODE_TOOLS
+#   - Type: Set[str] (Set of strings)
+#   - Values: {"write", "edit"}
 #
-# HEADS-UP: 'bash' is NOT in this set. extract_scripts treats it specially:
-#     if tool not in CODE_TOOLS and tool != "bash":  continue
-#   so "write"/"edit"/"bash" are the three tools that can produce ScriptArtifacts. 'read', 'glob',
-#   'grep', 'task', etc. are filtered out earlier (they appear in ToolCallArtifact lists but never
-#   become script artifacts).
+# Explanation of Members:
+#   - "write": Represents the OpenCode tool call that creates a new file or completely overwrites an existing file with new content.
+#   - "edit": Represents the OpenCode tool call that applies diff patches or search-and-replace edits to an existing file.
 #
-# VALID MEMBERSHIP TESTS:
-#   assert "write" in CODE_TOOLS   -> True
-#   assert "edit"  in CODE_TOOLS   -> True
-#   assert "bash"  in CODE_TOOLS   -> False  (handled by the separate != "bash" check)
-#   assert "read"  in CODE_TOOLS   -> False
-#   assert "glob"  in CODE_TOOLS   -> False
-#   assert "grep"  in CODE_TOOLS   -> False
+# Note on "bash":
+#   - "bash" is NOT included in CODE_TOOLS because terminal execution commands are handled separately via regex pattern parsing (heredocs, echo redirects, inline scripts).
 #
-# TESTING VALUES & VERIFICATION:
-#   - Sample checking code: assert tool_name in CODE_TOOLS
-#   - Boundary test 1: 'read' tool -> returns False (not a file-modifying tool).
-#   - Boundary test 2: 'bash' tool -> handled separately via terminal execution regex parsing.
-#   - Target test files: test.py, script.sh, index.js, app.ts
+# Non-file-modifying tools excluded from CODE_TOOLS:
+#   - "read", "glob", "grep", "task" (these appear in transcript tool logs but never create script artifacts).
+#
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.constants.code_tools import CODE_TOOLS; print("write" in CODE_TOOLS)' (outputs True)
+#   - Run: python3 -c 'from opencode_extractor.constants.code_tools import CODE_TOOLS; print("read" in CODE_TOOLS)' (outputs False)
+
+# Constant definition: Set containing string names of file-writing and editing tool actions
 CODE_TOOLS = {"write", "edit"}
