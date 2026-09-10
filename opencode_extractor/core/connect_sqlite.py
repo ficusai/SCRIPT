@@ -1,5 +1,14 @@
 """
 Opens safe read-only SQLite database connections.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .db (SQLite database path file target), .sqlite, .sqlite3
+- Formats Handled: SQLite binary database format, opened via URI connection string ("file:<path>?mode=ro")
+- Export Modes Supported: Thread-safe read-only connection pooling and dictionary lookup
+- Framework Possibilities:
+    - CLI: Connection manager for querying session tables
+    - Web Service (FastAPI / Flask): Shared connection cache for database queries
+    - Async Processing: Read-only handle provider for non-blocking reader tasks
 """
 
 from __future__ import annotations
@@ -30,15 +39,29 @@ from typing import Dict
 #   - Path with special characters: "/tmp/db_test#1?query.db" -> Escaped to "file:/tmp/db_test%231%3fquery.db?mode=ro"
 # Edge Cases:
 #   - Same path requested twice -> the SAME connection object identity is returned both times (no duplicate handles).
+# Testing Steps:
+#   - Pass empty dict `{}` and valid SQLite file path to `connect_sqlite({}, "/path/to/opencode.db")`
+#   - Verify returned object is an instance of `sqlite3.Connection`
 def connect_sqlite(conns: Dict[str, sqlite3.Connection], path: str) -> sqlite3.Connection:
     # Check if a connection to this file path is already open in our connections dictionary.
+    # Condition: `path not in conns` prevents redundant connection creation
     if path not in conns:
         # Build a safe URI path escaping special characters like '?' and '#' and enforcing read-only mode (?mode=ro).
+        # Variable Type: str URI string e.g. "file:/home/user/opencode.db?mode=ro"
         uri = "file:" + path.replace("?", "%3f").replace("#", "%23") + "?mode=ro"
+
         # Open the connection using SQLite's URI mode.
+        # Function Call: sqlite3.connect(uri, uri=True)
+        # Errors: sqlite3.OperationalError if file unreadable or invalid
         conn = sqlite3.connect(uri, uri=True)
+
         # Set row_factory to sqlite3.Row so query results can be accessed by column name like a dictionary.
         conn.row_factory = sqlite3.Row
+
         # Store the connection in our dictionary cache for future reuse.
         conns[path] = conn
+
+    # Return cached connection instance
+    # Return Type: sqlite3.Connection
     return conns[path]
+
