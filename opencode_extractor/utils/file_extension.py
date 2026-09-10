@@ -2,62 +2,56 @@
 Returns lowercased file extension without leading dot.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
-
-# Takes a file path string (such as "folder/script.py") and extracts just the extension part (like "py") in lowercase without the dot.
-# Function Parameters & Types:
-#   - path: str (Required) Input file path string (or None)
+# Function Purpose & Overview:
+# Extracts the file extension (the letters after the last dot) from a file path and turns it into lowercase letters without any leading dot.
+#
+# Function Parameters:
+#   - path: str (Required) The input file path string (e.g., "src/main.py", "C:\\scripts\\deploy.SH", None, or "").
 # Returns:
-#   - str: Lowercased extension string without dot (e.g. "py", "sh", "js", "ts") or empty string ""
+#   - str: The lowercased extension string without a leading dot (e.g. "py", "sh", "js", "ts", "json", "yaml") or "" if none.
 #
-# Step-by-Step Logic Breakdown:
-#   - Step 1: Safe fallback for None/empty path, converts Windows backslashes '\\' to POSIX forward slashes '/'.
-#   - Step 2: Extracts basename filename component following the final slash '/'.
-#   - Step 3: Checks if dot '.' exists in filename; if missing, returns empty string "".
-#   - Step 4: Splits filename at the rightmost dot and lowercases the extension string.
+# Supported Extensions Tested in Codebase:
+#   - Python: "py", "pyw"
+#   - Shell: "sh", "bash", "zsh", "fish", "ksh"
+#   - JavaScript / TypeScript: "js", "mjs", "cjs", "jsx", "ts", "tsx"
+#   - Other languages & configs: "go", "rs", "rb", "php", "lua", "sql", "java", "kt", "swift", "c", "cpp", "h", "json", "yaml", "toml", "md", "txt", "html", "css"
 #
-# ============================================================================
-# PARAMETER ACCEPTED VALUES
-# ============================================================================
-#   path may be: a POSIX path ("src/main.py"), a Windows path ("C:\\a\\b.py"), a bare filename
-#   ("deploy.sh"), a dotted/.hidden name (".gitignore"), or None/"" (both handled). Leading or
-#   trailing whitespace is NOT stripped before processing (see the "py " quirk below).
+# Options and Concrete Inputs:
+#   - POSIX path: "folder/script.py" -> returns "py"
+#   - Windows path: "C:\\folder\\script.SH" -> returns "sh"
+#   - Multi-dot path: "archive.tar.gz" -> returns "gz" (last dot wins)
+#   - Hidden / dotfile: ".gitignore" -> returns "gitignore"
+#   - No extension: "Dockerfile" or "folder/script" -> returns ""
+#   - None or empty string: None or "" -> returns ""
+#   - Whitespace in path: "app.py " -> returns "py " (whitespace is preserved because input is not pre-stripped)
 #
-# ============================================================================
-# COMPREHENSIVE BOUNDARY & EDGE CASE TESTS (all verified)
-# ============================================================================
-#   - Example 1: `file_extension("src/main.py")` -> `"py"`
-#   - Example 2: `file_extension("/home/user/scripts/deploy.SH")` -> `"sh"`   (lowercased)
-#   - Example 3: `file_extension("app/index.ts")` -> `"ts"`
-#   - Example 4: `file_extension("component.test.JSX")` -> `"jsx"`  (LAST dot wins - multi-dot names)
-#   - Example 5: `file_extension("Dockerfile")` -> `""` (no dot present)
-#   - Example 6: `file_extension(None)` -> `""` (handles None gracefully)
-#   - Example 7: `file_extension("C:\\path\\to\\script.BASH")` -> `"bash"` (normalizes Windows path slashes)
-#   - Example 8: `file_extension("tar.gz")` -> `"gz"`            (not "tar.gz", not "tar")
-#   - Example 9: `file_extension(".gitignore")` -> `"gitignore"` (leading-dot file splits on its own dot)
-#   - Example 10: `file_extension("folder/.hidden")` -> `"hidden"` (basename ".hidden" has a dot)
-#   - Example 11: `file_extension("name.")` -> `""`      (trailing dot -> empty right half)
-#   - Example 12: `file_extension("")` -> `""`
-#   - Example 13: `file_extension("héllo.py")` -> `"py"`  (unicode basename fine)
-#   - Example 14: `file_extension("a file with spaces.py")` -> `"py"` (spaces do not interfere)
-#   - Example 15: `file_extension("folder")` -> `""`      (no dot at all)
-#   - QUIRK: `file_extension("app.py ")` -> `"py "` (trailing space survives because input is not
-#     stripped; the consumer is expected to pass clean names).
-#   - Very long names: no truncation - "some_very_long_name_that_keeps_going.py" -> "py".
+# Edge Cases & Errors:
+#   - None passed as path: Handled safely by (path or ""), converting None to "".
+#   - Path with no dot: Handled by checking '.' not in name, returning "".
+#   - Path with trailing dot ("name."): Returns "" because string after last dot is empty.
 #
-# ============================================================================
-# CONSUMERS & DOWNSTREAM EFFECTS
-# ============================================================================
-#   - extract_scripts / parse_bash_artifacts feed the result into EXT_LABEL.get(ext, "") to build the
-#     artifact `kind` field, and store it verbatim as ScriptArtifact.extension. Because the result is
-#     always lowercase, EXT_LABEL lookups always hit the lowercase keys.
-#   - The empty-string returns are meaningful: artifacts built from no-extension paths get
-#     extension "" -> label fallback "📄 FILE" in ScriptArtifact.label.
-#
-# TESTED SCRIPT EXTENSION LIST: .py, .sh, .bash, .js, .ts, .json, .yaml
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.utils.file_extension import file_extension; print(file_extension("src/main.py"))' (outputs 'py')
+#   - Run: python3 -c 'from opencode_extractor.utils.file_extension import file_extension; print(file_extension("deploy.SH"))' (outputs 'sh')
+
+# Function declaration: Takes a file path string and returns a lowercased file extension string
 def file_extension(path: str) -> str:
+    # Line explanation: Converts None to "", normalizes Windows backslashes '\\' to POSIX forward slashes '/', and extracts the final filename after the last slash.
+    # Options: Accepts POSIX paths ("a/b.py"), Windows paths ("a\\b.py"), or bare filenames ("b.py"). Default for None/falsy path is "".
+    # Output: Variable 'name' holds the isolated filename string (e.g. "script.py", "deploy.SH", ".gitignore", "Dockerfile").
     name = (path or "").replace("\\", "/").rsplit("/", 1)[-1]
+    
+    # Line explanation: Checks if a period (dot '.') character exists anywhere in the isolated filename string.
+    # Edge case: If there is no dot (e.g. "Dockerfile", "README", "script"), no file extension exists.
+    # Output: Evaluates to True if dot is missing, causing immediate early return of empty string "".
     if "." not in name:
+        # Line explanation: Returns an empty string "" when the file has no extension dot.
         return ""
+        
+    # Line explanation: Splits the filename at the rightmost dot (rsplit(".", 1)) to get the part after the dot, then converts all characters to lowercase.
+    # Options & Multi-dot handling: For "archive.tar.gz", splits into ["archive.tar", "gz"] and returns "gz". For "MAIN.PY", returns "py".
+    # Output: Lowercase extension string without leading dot (e.g. "py", "sh", "js", "ts", "json").
     return name.rsplit(".", 1)[-1].lower()
