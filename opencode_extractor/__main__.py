@@ -1,5 +1,5 @@
 """
-CLI entry point for running opencode_extractor as a module (python -m opencode_extractor).
+CLI entry point for running opencode_extractor as a module (python3 -m opencode_extractor).
 This file lets users run the extractor directly from the terminal prompt using the python command.
 
 Structured Architecture Notes & Compatibility Matrix:
@@ -10,6 +10,17 @@ Structured Architecture Notes & Compatibility Matrix:
     - CLI: Direct terminal invocation interface
     - Environment Bootstrap: Automatically appends repository root to sys.path to ensure module imports succeed regardless of working directory
 """
+
+# (DevOps Note: Missing --debug / -v flag — no verbosity or debug logging level is exposed at the entry point.
+#  For troubleshooting in production environments, consider adding an argparse --debug flag that enables
+#  Python logging at DEBUG level before main() runs. This aids remote incident diagnosis without patching code.)
+
+# (DevOps Note: Platform limitation — this module relies on Unix-style path separators and posixpath conventions.
+#  Running under Windows via WSL or native Python may produce path-collation issues in export_session_bundles.)
+
+# (DevOps Note: No requirements.txt, setup.py, or pyproject.toml exists in the repository root.
+#  Dependency installation must be performed manually by the operator. Document required packages in a README
+#  or add a requirements.txt with pinned versions for reproducible deployments.)
 
 import sys
 from pathlib import Path
@@ -90,6 +101,10 @@ from pathlib import Path
 # Compute absolute path to repository root folder (two directory levels up from __main__.py)
 # Variable Type: pathlib.Path
 root_dir = Path(__file__).resolve().parent.parent
+
+# (DevOps Note: sys.path insert(0, ...) modifies the interpreter's module search path globally.
+#  In multi-package environments or when this module is imported by another package, this can shadow
+#  installed packages. Consider using a dedicated PYTHONPATH or virtual-environment isolation instead.)
 
 # Add root directory to sys.path if not already present to ensure opencode_extractor can be imported
 # Condition: `str(root_dir) not in sys.path` prevents duplicate path entries
