@@ -1,10 +1,10 @@
-# OC-SCRIPT-EXTRACTOR
+# "SCRIPT" by FICUS (ficusai)
 
 A desktop application and Python library for extracting scripts, tool calls, and session artifacts from OpenCode AI coding assistant databases.
 
 ## Overview
 
-OpenCode Script Extractor scans SQLite databases and text dumps created by [OpenCode](https://opencode.ai) — an AI-powered coding agent — and extracts all code artifacts (scripts, configurations, patches) along with complete tool call transcripts. It provides both a GUI and CLI interface for browsing, filtering, and exporting session data.
+**SCRIPT by FICUS (ficusai)** scans SQLite databases and text dumps created by [OpenCode](https://opencode.ai) — an AI-powered coding agent — and extracts all code artifacts (scripts, configurations, patches) along with complete tool call transcripts. It provides both a GUI and CLI interface for browsing, filtering, and exporting session data.
 
 **GitHub:** https://github.com/ficusai/SCRIPT
 

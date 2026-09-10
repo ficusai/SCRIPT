@@ -3,10 +3,10 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "opencode-script-extractor"
+name = "script"
 version = "1.0.0"
-description = "Extract scripts, tool calls, and session artifacts from OpenCode databases"
-authors = [{ name = "Ficus AI" }]
+description = "SCRIPT by FICUS (ficusai) - Extract scripts, tool calls, and session artifacts from OpenCode databases"
+authors = [{ name = "FICUS (ficusai)" }]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

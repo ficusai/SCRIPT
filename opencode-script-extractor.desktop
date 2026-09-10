@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=OpenCode Script Extractor
+Name=SCRIPT
 Comment=Extract scripts and code files from OpenCode session history and subagents
 Exec=opencode-script-extractor.sh
-Icon=utilities-terminal
+Icon=opencode-script-extractor
 Terminal=false
-Categories=Development;
+Categories=Development;Utility;
 StartupNotify=true
