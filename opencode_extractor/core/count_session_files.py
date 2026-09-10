@@ -44,6 +44,7 @@ from typing import Dict
 # Testing Steps:
 #   - Call `count_session_files(extractor)`
 #   - Verify returned value is `dict` mapping string session IDs to non-negative integer counts
+import json
 from opencode_extractor.core.parse_bash_artifacts import parse_bash_artifacts
 from opencode_extractor.core.parse_part_json import parse_part_json
 from opencode_extractor.utils.is_script_path import is_script_path
@@ -59,49 +60,98 @@ def count_session_files(extractor) -> Dict[str, int]:
         extractor._file_counts_cache = file_counts
         return file_counts
 
-    sid_to_root: Dict[str, str] = {}
     for r in roots:
         file_counts[r.id] = 0
-        try:
-            tree = extractor.root_tree(r.id)
-            for member_id in tree.all_ids:
-                sid_to_root[member_id] = r.id
-        except Exception:
-            pass
 
-    all_sids = list(sid_to_root.keys())
-    if not all_sids:
+    sessions = extractor._sessions or {}
+    root_ids = {r.id for r in roots}
+    sid_to_root: Dict[str, str] = {}
+    for sid, sess in sessions.items():
+        curr = sess
+        visited = set()
+        while curr and curr.parent_id and curr.id not in root_ids and curr.id not in visited:
+            visited.add(curr.id)
+            curr = sessions.get(curr.parent_id)
+        if curr and curr.id in root_ids:
+            sid_to_root[sid] = curr.id
+
+    if not sid_to_root:
         extractor._file_counts_cache = file_counts
         return file_counts
 
     root_artifacts: Dict[str, set] = {r.id: set() for r in roots}
 
     try:
-        parts = parse_part_json(extractor.db_sources, extractor._conns, extractor._text_parts, all_sids)
-        for sid, obj in parts:
-            root_id = sid_to_root.get(sid)
-            if not root_id:
-                continue
-            if obj.get("type") != "tool":
-                continue
-            tool = obj.get("tool")
-            state = obj.get("state")
-            state = state if isinstance(state, dict) else {}
-            inp = state.get("input")
-            inp = inp if isinstance(inp, dict) else {}
+        for src in extractor.db_sources:
+            if src.kind == "sqlite":
+                con = extractor._connect_path(src.path)
+                cursor = con.execute("""
+                    SELECT session_id, data FROM part 
+                    WHERE data LIKE '%"tool":"write"%' 
+                       OR data LIKE '%"tool":"edit"%' 
+                       OR data LIKE '%"tool":"bash"%'
+                """)
+                for sid, data in cursor:
+                    root_id = sid_to_root.get(sid)
+                    if not root_id:
+                        continue
+                    try:
+                        obj = json.loads(data)
+                    except Exception:
+                        continue
 
-            if tool in ("write", "edit"):
-                fp = str(inp.get("filePath") or "")
-                if fp and is_script_path(fp):
-                    root_artifacts[root_id].add(fp)
-            elif tool == "bash":
-                cmd = str(inp.get("command") or "")
-                status = str(state.get("status") or "")
-                for extracted in parse_bash_artifacts(sid, "", "", False, None, cmd, status, ""):
-                    root_artifacts[root_id].add(extracted.filePath)
+                    if not isinstance(obj, dict) or obj.get("type") != "tool":
+                        continue
+
+                    tool = obj.get("tool")
+                    state = obj.get("state")
+                    state = state if isinstance(state, dict) else {}
+                    inp = state.get("input")
+                    inp = inp if isinstance(inp, dict) else {}
+
+                    if tool in ("write", "edit"):
+                        fp = str(inp.get("filePath") or "")
+                        if fp and is_script_path(fp):
+                            root_artifacts[root_id].add(fp)
+                    elif tool == "bash":
+                        cmd = str(inp.get("command") or "")
+                        if not cmd:
+                            continue
+                        status = str(state.get("status") or "")
+                        if any(k in cmd for k in (">", "python", ".py", ".sh", ".bash", ".js", ".ts", "node", "ruby", "perl", "zsh")):
+                            for extracted in parse_bash_artifacts(sid, "", "", False, None, cmd, status, ""):
+                                root_artifacts[root_id].add(extracted.filePath)
+
+            elif src.kind == "text_dump" and extractor._text_parts:
+                for sid, parts in extractor._text_parts.items():
+                    root_id = sid_to_root.get(sid)
+                    if not root_id:
+                        continue
+                    for _mid, obj in parts:
+                        if not isinstance(obj, dict) or obj.get("type") != "tool":
+                            continue
+                        tool = obj.get("tool")
+                        state = obj.get("state")
+                        state = state if isinstance(state, dict) else {}
+                        inp = state.get("input")
+                        inp = inp if isinstance(inp, dict) else {}
+
+                        if tool in ("write", "edit"):
+                            fp = str(inp.get("filePath") or "")
+                            if fp and is_script_path(fp):
+                                root_artifacts[root_id].add(fp)
+                        elif tool == "bash":
+                            cmd = str(inp.get("command") or "")
+                            if not cmd:
+                                continue
+                            status = str(state.get("status") or "")
+                            if any(k in cmd for k in (">", "python", ".py", ".sh", ".bash", ".js", ".ts", "node", "ruby", "perl", "zsh")):
+                                for extracted in parse_bash_artifacts(sid, "", "", False, None, cmd, status, ""):
+                                    root_artifacts[root_id].add(extracted.filePath)
 
         for root_id, art_set in root_artifacts.items():
             file_counts[root_id] = len(art_set)
+
     except Exception:
         for r in roots:
             try:

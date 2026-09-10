@@ -37,10 +37,8 @@ class ScanWorker(QThread):
     finished_signal = pyqtSignal(list, dict, list)
     # Signal emitted if an error happens during scanning, sending back the exception string text.
     error_signal = pyqtSignal(str)
-    # (UX Note: The ScanWorker emits only finished and error signals, with no progress signal during scanning.
-    #  For databases with many sessions, the user may experience a long delay with no feedback, potentially
-    #  thinking the application has frozen. Consider adding a progress_signal(int, int, str) to report
-    #  scanning progress (e.g., "Scanning database 1 of 3...") for better perceived performance.)
+    # Signal emitted during scanning to update status progress text in the GUI.
+    progress_signal = pyqtSignal(str)
 
     # Sets up the worker and remembers which database path to scan (defaults to "all").
     # Example testing values: db_path="all", db_path="/tmp/opencode_test.db".
@@ -52,27 +50,15 @@ class ScanWorker(QThread):
     # This method executes automatically on a separate background thread when worker.start() is called.
     def run(self):
         try:
-            # Step 1: Discover available database locations on the computer system.
-            db_sources = discover_all_databases()
-            # Step 2: Open the database extractor tool safely within a context manager.
-            # (Performance Note: discover_all_databases() is called AND OpenCodeExtractor is constructed separately.
-            #  OpenCodeExtractor.__init__() calls discover_all_databases() AGAIN internally when db_path is "all",
-            #  resulting in redundant filesystem scanning. Consider passing db_sources directly to OpenCodeExtractor
-            #  or having the constructor accept an already-discovered source list to eliminate the duplicate scan.)
+            self.progress_signal.emit("Discovering database sources...")
             with OpenCodeExtractor(self.db_path) as ex:
-                # Step 3: Fetch all top-level chat session objects from the database.
+                db_sources = ex.db_sources
+                self.progress_signal.emit(f"Loading sessions from {len(db_sources)} sources...")
                 roots = ex.root_sessions()
-                # Step 4: Count how many script files exist across each session ID.
+                self.progress_signal.emit(f"Counting scripts across {len(roots)} root sessions...")
                 script_counts = ex.get_session_file_counts()
-                # Step 5: Emit completion signal across thread boundary to main thread slot (on_sessions_loaded).
-                # Signal payload: (roots: list[Session], script_counts: dict[str, int], db_sources: list[DBSource])
                 self.finished_signal.emit(roots, script_counts, db_sources)
         except Exception as e:
-            # Exception Handling & UI State Recovery:
-            # If any failure occurs during DB connection or querying, capture exception object 'e'.
-            # Emits error_signal with exception text string e.g. "sqlite3.OperationalError: database locked".
-            # Receiver on_scan_error on main thread will hide loading progress bar, re-enable refresh button, and show popup.
-            # Handles exception types: sqlite3.OperationalError, FileNotFoundError, PermissionError, AttributeError.
             self.error_signal.emit(str(e))
 
 # ADDITIONAL DOCUMENTATION - FULL SCANWORKER CONTRACT

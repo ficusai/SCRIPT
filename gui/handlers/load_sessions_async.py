@@ -46,13 +46,15 @@ def load_sessions_async(window):
     # Step 5: Instantiate background worker thread with currently selected database path setting.
     # Testing values: window.current_db_path="all", window.current_db_path="/tmp/opencode.db".
     window.scan_thread = ScanWorker(window.current_db_path)
-    # Step 6: Connect completion signal to on_sessions_loaded callback to populate GUI table and dropdown.
+    # Step 6: Connect progress signal to update bottom status text during scanning.
+    window.scan_thread.progress_signal.connect(lambda msg: window.status_lbl.setText(msg))
+    # Step 7: Connect completion signal to on_sessions_loaded callback to populate GUI table and dropdown.
     # Signal payload expected: (roots: list[Session], script_counts: dict[str, int], db_sources: list[DBSource])
     window.scan_thread.finished_signal.connect(lambda roots, counts, db_sources: on_sessions_loaded(window, roots, counts, db_sources))
-    # Step 7: Connect failure signal to on_scan_error callback to display critical error popup dialog.
+    # Step 8: Connect failure signal to on_scan_error callback to display critical error popup dialog.
     # Signal payload expected: (err_msg: str)
     window.scan_thread.error_signal.connect(lambda err_msg: on_scan_error(window, err_msg))
-    # Step 8: Launch background worker thread execution on QThread.
+    # Step 9: Launch background worker thread execution on QThread.
     window.scan_thread.start()
 
 # ADDITIONAL DOCUMENTATION - FULL CONTRACT
