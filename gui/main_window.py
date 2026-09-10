@@ -55,6 +55,24 @@ from gui.handlers.load_sessions_async import load_sessions_async
 #   Export:  export_tool_calls_cb / export_scripts_cb / create_folder_cb / preserve_paths_cb / zip_cb / patches_cb
 #           (QCheckBox), export_btn (QPushButton)
 #   Footer:  status_lbl (QLabel), progress_bar (QProgressBar)
+# (Compat Note: PyQt6 Qt.Orientation.Horizontal is available since PyQt6 6.0. No version issue.
+#
+#  (Compat Note: Window size 1200x780 is a recommendation, not a minimum. On low-resolution
+#  displays (<1024x600), the UI may become unusable. No minimum size enforcement is present.
+#  Consider adding `self.setMinimumSize(1024, 600)` for better compatibility.
+#
+#  (Compat Note: The dark stylesheet uses hardcoded Catppuccin color values (#1e1e2e, #89b4fa).
+#  These CSS color values are parsed by Qt's stylesheet engine which supports hex colors since
+#  Qt 5.0. No compatibility issue with PyQt6.
+#
+#  (Compat Note: QSplitter with setSizes([520, 680]) sums to 1200 (the window width). On windows
+#  with decorations/borders, the actual client area may be slightly smaller, causing the splitter
+#  to overflow. Qt handles this by scaling proportions, but the exact pixel values may not
+#  match on all platform/widget theme combinations.
+#
+#  (Compat Note: The app stores state on the window instance (db_sources, current_db_path, etc.).
+#  These are plain Python attributes with no serialization. If the window is recreated (e.g.,
+#  after a crash recovery), all state is lost. No persistence mechanism is implemented.
 class MainWindow(QMainWindow):
     # (Accessibility Note: No accessible name or objectName is set on the main window for screen readers.
     #  Consider calling self.setObjectName("MainWindow") and setting an accessible description via
@@ -63,6 +81,12 @@ class MainWindow(QMainWindow):
     # (UX Note: No global keyboard shortcuts are defined. Users cannot access common actions like Refresh (Ctrl+R),
     #  Export (Ctrl+E), or Search focus (Ctrl+F) via keyboard. Adding QAction objects with shortcuts would improve
     #  keyboard-only usability significantly.)
+    # (UX Note: The application does not implement a visible focus indicator for keyboard navigation beyond the
+    #  CSS border color change. Users navigating with Tab key may have difficulty tracking which widget is active.
+    #  The Tab order is: db_combo -> search_input -> filter_combo -> refresh_btn -> session_table ->
+    #  select_all_sessions_btn -> deselect_all_sessions_btn -> script_list -> select_all_btn -> deselect_all_btn ->
+    #  export_tool_calls_cb -> export_scripts_cb -> create_folder_cb -> preserve_paths_cb -> zip_cb -> patches_cb ->
+    #  export_btn. Consider documenting this order in a help dialog or adding a focus policy hint.)
     # Function note: Initializes the main window, configures window dimensions, sets dark theme styles, and prepares state variables.
     # Why it exists: Sets up the initial state data structures and triggers window construction and background DB scanning.
     # Layout settings: Sets 1200px width and 780px height; applies DARK_STYLESHEET CSS styling rules.
@@ -161,6 +185,12 @@ class MainWindow(QMainWindow):
         #  The user sees an empty window with no indication that scanning is in progress. Consider showing a
         #  splash message or enabling the progress bar during the initial scan, similar to what is done during
         #  batch exports. This reduces uncertainty about whether the app has frozen.)
+        # (UX Note: Loading state - The status footer shows "Ready" initially but provides no feedback during
+        #  the background database scan. Users may perceive the app as hung if scanning takes several seconds.
+        #  Consider updating status_lbl to "Scanning databases..." before load_sessions_async() starts.)
+        # (Empty State Note: When no sessions exist in any database, the table displays empty rows with no
+        #  explanatory message. Consider showing a placeholder message like "No sessions found. Click Refresh
+        #  to scan for databases." when root_sessions is empty after scanning completes.)
 # (Test Note: Missing test suite — zero pytest/unit tests exist in this project. Add integration tests for:
 #   1. Startup sequence: app launches -> ScanWorker starts automatically -> on_sessions_loaded fires -> table populated.
 #   2. Signal-slot connections: verify scan_thread.finished_signal and error_signal are connected before .start().

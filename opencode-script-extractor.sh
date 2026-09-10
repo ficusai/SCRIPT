@@ -38,8 +38,39 @@
 # - Edge cases & Errors: If an undefined variable like `$MISSING_VAR` is accessed under `set -u`, bash prints `MISSING_VAR: unbound variable` and exits immediately with status code 1.
 # - How to test: Run `bash -n opencode-script-extractor.sh` to perform a syntax check without running the script. Or test in terminal: `bash -c 'set -euo pipefail; echo $UNDEFINED_VAR'` to see the unbound variable error in action.
 set -euo pipefail
+# (Compat Note: `set -euo pipefail` requires Bash 4.0+. This is available on all modern Linux
+#  distributions (Ubuntu 16.04+, Debian 9+, Fedora 25+). However, on macOS the default bash
+#  is version 3.2 (limited by Apple's licensing), which does support these flags but may have
+#  subtle differences in error handling behavior. For macOS compatibility, test thoroughly.
+#
+#  (Compat Note: `${BASH_SOURCE[0]}` is a Bash-specific feature not available in POSIX sh.
+#  The shebang `#!/usr/bin/env bash` ensures Bash is used. If the script is invoked as
+#  `sh opencode-script-extractor.sh` (forcing POSIX shell), `${BASH_SOURCE[0]}` will fail.
+#  Fallback: Use `$0` instead, but note that `$0` resolves to the invocation path, not the
+#  script's canonical location (symlinks not resolved).
 
-# Line 56 explanation: `SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`
+# (Compat Note: `pwd` behavior — in strict POSIX mode, `pwd` may return the logical path
+#  (following symlinks) or physical path depending on shell settings. `pwd -P` forces physical.
+#  The current `pwd` without flags is logical by default, which matches the expected behavior
+#  for finding the script directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# (Compat Note: `exec python3` replaces the shell process with Python. This is standard POSIX
+#  behavior and works on all platforms where bash and python3 are available.
+#
+#  (Compat Note: Python version check missing — the script does not verify that python3 is
+#  >= 3.11 (required by the project). A older Python version will fail at import time with
+#  opaque errors. Consider adding:
+#    PYTHON_MIN_VERSION="3.11"
+#    python3 -c "import sys; exit(0 if sys.version_info >= tuple(map(int, '${PYTHON_MIN_VERSION}'.split('.'))) else 1)" || {
+#      echo "Error: Python >= ${PYTHON_MIN_VERSION} is required" >&2; exit 1
+#    }
+#
+#  (Compat Note: Platform detection missing — on macOS, the script path resolution works but
+#  the XDG data paths referenced in discover_all_databases.py do not exist. On Windows,
+#  bash itself may not be available unless Git Bash or WSL is installed.
+#  For cross-platform support, detect OS and adjust paths accordingly.
+exec python3 "${SCRIPT_DIR}/gui/__main__.py" "$@"
 # - What it does: Calculates the absolute folder path of the directory containing this script, regardless of where in the filesystem the user ran the command from.
 # - Step-by-step decomposition:
 #   1. `${BASH_SOURCE[0]}`: A special Bash array variable containing the path used to call this script (e.g., `./opencode-script-extractor.sh` or `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh`).

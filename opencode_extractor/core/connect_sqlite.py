@@ -43,11 +43,35 @@ from typing import Dict
 #   - Pass empty dict `{}` and valid SQLite file path to `connect_sqlite({}, "/path/to/opencode.db")`
 #   - Verify returned object is an instance of `sqlite3.Connection`
 def connect_sqlite(conns: Dict[str, sqlite3.Connection], path: str) -> sqlite3.Connection:
-    # Check if a connection to this file path is already open in our connections dictionary.
-    # Condition: `path not in conns` prevents redundant connection creation
+    # (Compat Note: Python >= 3.11 required for `from __future__ import annotations` to work correctly
+    #  with sqlite3.Connection type hints. On Python < 3.10, this import has no effect and may
+    #  cause subtle behavior differences. The project requires Python 3.11+.
+    #
+    #  (Compat Note: SQLite URI mode requires sqlite3 module compiled with SQLITE_ENABLE_URI=1.
+    #  This is enabled by default in Python's sqlite3 module on all standard distributions since
+    #  Python 3.2, but some minimal/embedded builds may disable it. If URI mode fails, the
+    #  `uri=True` parameter will raise sqlite3.OperationalError.
+    #  Fallback: Open with plain path string and set read-only via PRAGMA, but this is less safe.
+    #
+    #  (Compat Note: SQLite read-only URI mode (`?mode=ro`) prevents write locks but requires
+    #  the underlying file to not have the SQLite journal/WAL lock. If the database is currently
+    #  open for writing by another process, this connection will fail with "database is locked".
+    #
+    #  (Compat Note: sqlite3.Row factory is available in Python's stdlib sqlite3 since 2.6.
+    #  No version constraint here, but note that Row objects are dict-like and do not support
+    #  slice indexing — only key-based access like row["column_name"].
+    #
+    #  (Compat Note: Path separator assumption — this function expects POSIX-style paths with
+    #  forward slashes. On Windows, backslashes in paths must be escaped or use raw strings.
+    #  The URI builder `file:` prefix is POSIX-oriented and may produce invalid URIs on Windows.
+    #  Fallback for Windows: use `pathlib.Path.as_uri()` which produces valid file:// URIs.
     if path not in conns:
-        # Build a safe URI path escaping special characters like '?' and '#' and enforcing read-only mode (?mode=ro).
+        # Build a safe URI path escaping special characters ('?' -> '%3f', '#' -> '%23') and enforcing read-only mode (?mode=ro).
         # Variable Type: str URI string e.g. "file:/home/user/opencode.db?mode=ro"
+        # (Compat Note: Character escaping assumes UTF-8 path encoding. On systems using non-UTF8
+        #  locale encodings (e.g. some legacy Linux setups with LANG=C), paths containing non-ASCII
+        #  characters may produce invalid URIs. Python 3.11+ uses UTF-8 as the default filesystem
+        #  encoding on all platforms (PEP 597), so this is safe on supported Python versions.)
         uri = "file:" + path.replace("?", "%3f").replace("#", "%23") + "?mode=ro"
 
         # Open the connection using SQLite's URI mode.

@@ -59,6 +59,31 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #  cause silent data misalignment. The query does not use WHERE clauses, so all sessions including
 #  deleted/purged sessions are loaded. The text dump path uses load_text_dump_sessions() which applies
 #  different defaults (agent="build", model="opencode-dump") and does not parse timestamps.)
+# (Compat Note: Python >= 3.11 required for `from __future__ import annotations`. The typing
+#  imports (Dict, List, Tuple) are available since Python 3.5 but the `from __future__` import
+#  is a no-op before Python 3.7. Project requires 3.11+.
+#
+#  (Compat Note: SQLite schema assumption — this loader expects a `session` table with exactly
+#  these columns in this order: (id, title, agent, model, directory, parent_id, time_created, time_updated).
+#  Any schema migration in the upstream OpenCode app that adds/removes/reorders columns will cause
+#  silent data misalignment. SessionInfo constructor call at line 134 must match the SELECT column order.
+#  Fallback: No schema version check is performed; a schema mismatch manifests as WrongType or
+#  missing-attribute errors caught by the broad `except Exception: continue` at line 169.
+#
+#  (Compat Note: Timestamp parsing delegates to `parse_ts()` which handles both seconds-since-epoch
+#  (REAL) and milliseconds-since-epoch (INTEGER). The heuristic (divide by 1000 first, fall back
+#  to raw) can misclassify timestamps between 1 and 1000 seconds (1970) as milliseconds.
+#  This is an inherent ambiguity in epoch timestamp design, not a version issue.
+#
+#  (Compat Note: The `except Exception: continue` at line 169 silently swallows ALL errors including
+#  schema mismatches, permission errors, and connection failures. No error is logged to the user.
+#  On systems where SQLite databases have restrictive permissions (e.g., SELinux-enabled systems),
+#  sessions will appear missing without any diagnostic.
+#
+#  (Compat Note: Filesystem path handling — src.path is passed directly to sqlite3.connect as a URI.
+#  On Windows, absolute paths contain backslashes and drive letters (C:\...) which are invalid in
+#  SQLite URI mode. The `file:` prefix assumes POSIX paths. Windows support requires converting
+#  paths via pathlib.Path.as_uri() before this function is called.
 def load_sessions(
     # (Parameter note: List of DatabaseSource objects specifying which SQLite or text dump files to read.
     #  Each DatabaseSource has fields: label (str), path (str), size_mb (float), kind (str).

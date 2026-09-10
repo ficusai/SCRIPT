@@ -61,6 +61,30 @@ from opencode_extractor.models.session_info import SessionInfo
 #  the full JSON payload including any embedded pipes. JSON parsing uses strict mode; malformed JSON is
 #  per-line skipped, not file-aborted. The sessions dict is mutated in-place; calling with an existing
 #  session ID only appends parts, never updates metadata.)
+# (Compat Note: Python >= 3.11 required for `from __future__ import annotations`.
+#
+#  (Compat Note: Text dump format versioning — this parser assumes a specific pipe-delimited
+#  format: `<session_id>|<message_id>|<json_payload>` with exactly one JSON object per line.
+#  There is no format version header or magic bytes to distinguish this format from other
+#  pipe-delimited exports. If OpenCode changes its text dump format in a future version,
+#  this parser will silently produce incorrect results (malformed titles, missing fields).
+#  Fallback: Add a version magic header (e.g., `#opencode-dump-v1`) as the first line of
+#  the dump file and check for it in this function.
+#
+#  (Compat Note: File encoding — `errors="replace"` means invalid UTF-8 bytes become U+FFFD.
+#  On systems with different default encodings (e.g., Windows cp1252, Japanese EUC-JP),
+#  the explicit utf-8 encoding override ensures consistent behavior across platforms.
+#  However, if the dump was created on a non-UTF8 system with mixed-content files, some
+#  characters may be irreversibly replaced.
+#
+#  (Compat Note: Pipe delimiter "|" inside session IDs or message IDs will break parsing.
+#  The maxsplit=2 ensures the JSON payload preserves embedded pipes, but the first two
+#  fields (sid, mid) cannot contain pipes. If OpenCode generates session IDs with pipes
+#  in a future version, parsing will fail for those entries.
+#
+#  (Compat Note: Title inference path `obj["state"]["input"]["description"]` assumes a
+#  specific JSON structure that may change between OpenCode versions. If the structure
+#  changes, titles will fall back to "Dump Session (<sid[:10]>)" without any warning.
 def load_text_dump_sessions(
     # (Parameter note: Absolute or relative file path to the text dump file to parse.
     #  The file must be a plain text file with one JSON payload per line, pipe-delimited.

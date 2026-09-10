@@ -65,6 +65,28 @@ from opencode_extractor.cache.load_export_cache import load_export_cache
 #    - Verify is_session_exported("sess_single") returns True
 #    - Call again with different values -> verify the cache entry is updated (not duplicated)
 # )
+# (Compat Note: Python >= 3.11 required for `from __future__ import annotations`.
+#  The `_dt` alias for `datetime` is used to avoid shadowing the standard `datetime` module
+#  when imported in contexts where datetime is also imported directly.
+#
+#  (Compat Note: Atomic file replacement via `Path.replace()` relies on POSIX rename() semantics
+#  which is atomic only within the same filesystem/mount point. On cross-filesystem operations
+#  (e.g., CACHE_FILE on ext4 but tmp on a different mount), `replace()` falls through to the
+#  except block and performs a direct write. The fallback is less safe but still functional.
+#
+#  (Compat Note: Cache file path `~/.local/share/opencode/export_cache.json` follows XDG Base
+#  Directory Specification (XDG_CONFIG_HOME / XDG_DATA_HOME). On systems where these
+#  environment variables are set to non-standard locations, the cache will still be written
+#  to the hardcoded path. Users who rely on custom XDG paths should be aware of this limitation.
+#
+#  (Compat Note: JSON `indent=2` formatting is stable across Python versions. The `"version": 1`
+#  field is reserved for future schema migrations. If OpenCode changes the exported session
+#  structure, this version number should be incremented and backward-compatible parsing added.
+#
+#  (Compat Note: ISO 8601 timestamp output from `datetime.now().isoformat()` is available since
+#  Python 3.2. No version constraint issue here, but note that the output format does not
+#  include timezone information (naive datetime). For UTC-aware timestamps, use
+#  `datetime.now(timezone.utc).isoformat()`.
 def mark_session_exported(
     # (Parameter note: Unique string identifier for the session that was exported.
     #  This becomes the key in the cache dictionary. Leading and trailing whitespace is stripped.

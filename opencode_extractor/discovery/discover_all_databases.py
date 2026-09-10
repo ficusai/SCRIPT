@@ -83,6 +83,28 @@ from opencode_extractor.models.database_source import DatabaseSource
 #    - With one database: should return a list with one DatabaseSource
 #    - With multiple databases: should return them sorted by session_count descending
 # )
+# (Compat Note: Python >= 3.11 required for `from __future__ import annotations`.
+#
+#  (Compat Note: Hardcoded Linux paths — DB_CANDIDATE_PATHS and TEXT_DUMP_PATHS contain paths
+#  specific to Linux filesystem layout:
+#    - `~/.local/share/opencode/*.db` (XDG_DATA_HOME on Linux)
+#    - `/run/media/<user>/<drive>/` (Linux autofs mount point)
+#    - `/media/<user>/` (fallback mount point)
+#  These paths do not exist on Windows or macOS. On those platforms, this function returns
+#  an empty list without any warning or error. Windows users must manually configure paths.
+#
+#  (Compat Note: glob.glob() with `**` recursive patterns requires Python 3.5+. The project
+#  targets 3.11+ so this is not a concern, but note that `recursive=True` is the default
+#  behavior for `**` patterns in Python 3.11+.
+#
+#  (Compat Note: The drive name parsing `p.split("/run/media/ficus-pro/")[1].split("/")[0]`
+#  hardcodes the current username "ficus-pro". On other systems, this split will fail and
+#  the label will show "External" as fallback. A more portable approach would use
+#  `os.environ.get('USER')` or `pathlib.Path.home().name`.
+#
+#  (Compat Note: SQLite COUNT(*) query behavior is consistent across SQLite versions 3.x.
+#  However, the `session` table schema is assumed to exist. If OpenCode changes its database
+#  schema (adds/removes tables), this discovery will still list the file but with count 0.
 def discover_all_databases() -> List[DatabaseSource]:
     # (DevOps Note: This function performs synchronous glob.glob() calls across multiple high-level directories
     #  (/run/media, /media, /mnt). On systems with slow USB/network mounts or automounter delays,

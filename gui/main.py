@@ -29,6 +29,24 @@ from gui.main_window import MainWindow
 #     This is the reason tests must instantiate MainWindow directly after an existing QApplication.
 #   - If PyQt6 is missing, the `from PyQt6.QtWidgets import QApplication` import at module top raises
 #     ModuleNotFoundError before main() is ever called.
+# (Compat Note: PyQt6 — This application requires PyQt6 to be installed. The minimum supported
+#  version is not declared in the code but should be >= 6.4 to ensure API stability.
+#  PyQt6 is not available on PyPI for Python < 3.8. Project requires Python 3.11+.
+#
+#  (Compat Note: QApplication requires a display server (X11 or Wayland) on Linux. On headless
+#  servers or CI environments, the application will crash with "Could not connect to display".
+#  Workaround: Set `QT_QPA_PLATFORM=offscreen` environment variable before launching.
+#  On macOS, Qt requires a GUI session; headless execution requires `-platform offscreen`.
+#
+#  (Compat Note: Only one QApplication may exist per process. Calling main() twice raises
+#  RuntimeError. This is a Qt limitation, not a Python version issue.
+#
+#  (Compat Note: The `sys.argv` handling is cross-platform. Qt strips its own flags (-platform,
+#  -style, -stylesheet) from sys.argv before the application processes remaining arguments.
+#  This behavior is consistent across Qt6 versions.
+#
+#  (Compat Note: Exit code from `app.exec()` is 0 on normal exit, non-zero on crash. This is
+#  consistent across Qt6 and platform implementations.
 def main():
     # (DevOps Note: No --headless / --platform offscreen flag is exposed to the user.
     #  To run in CI or headless environments, the operator must inject QT_QPA_PLATFORM=offscreen
