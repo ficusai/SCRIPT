@@ -110,6 +110,9 @@ def build_script_preview_panel(window) -> QGroupBox:
     #  window.script_list.setAccessibleName("Extracted script files list") for screen reader context.)
     # (UX Note: The script list uses single-selection mode by default. Consider enabling multi-selection
     #  (ExtendedSelection) to allow users to select multiple scripts for side-by-side comparison.)
+    # (Focus Management Note: When switching sessions, focus does not reset to the script list.
+    #  Keyboard users may be confused about where their focus lands after selecting a new session.
+    #  Consider setting focus to script_list when on_scripts_extracted fires.)
     # Signal Trigger: Display full code contents in preview box when user clicks on a script item.
     window.script_list.itemSelectionChanged.connect(lambda: on_script_selected(window))
     script_list_layout.addWidget(window.script_list)
@@ -124,6 +127,8 @@ def build_script_preview_panel(window) -> QGroupBox:
     # Line note: Label for code preview text section.
     preview_lbl = QLabel("Script Code Preview:")
     preview_layout.addWidget(preview_lbl)
+    # (Accessibility Note: The preview label could include a mnemonic (&Code Preview) to allow
+    #  keyboard access to the preview pane via Alt+C.)
 
     # Line note: Create read-only text editing box using fixed-width monospace font to display source code preview cleanly.
     # Parameter choices: Read-only (`setReadOnly(True)`), Monospace 10pt font for aligned code formatting.
@@ -134,22 +139,30 @@ def build_script_preview_panel(window) -> QGroupBox:
     #  window.code_preview.setAccessibleName("Script code preview") to help screen reader users understand
     #  the purpose of this pane.)
     # (UX Note: There is no word wrap toggle for the code preview. Very long code lines will scroll horizontally,
-    #  which can be frustrating. Consider adding a wrap/nowrap toggle button.)
+    #  which can be frustrating. Consider adding a wrap/nowrap toggle button in the preview header.)
     # (UX Note: There is no copy-to-clipboard button for the code preview. Users must manually select and copy
-    #  code, which is inconvenient. Consider adding a copy button in the preview header.)
+    #  code, which is inconvenient. Consider adding a copy button with icon in the preview header.)
+    # (Keyboard Navigation Note: Users can navigate the script list with arrow keys and view code with Enter.
+    #  However, there is no keyboard shortcut to jump directly to the code preview pane from the list.
+    #  Consider adding Ctrl+Enter or double-click to open the preview for the selected script.)
     window.code_preview = QTextEdit()
     window.code_preview.setReadOnly(True)
     font = QFont("Monospace", 10)
     window.code_preview.setFont(font)
     preview_layout.addWidget(window.code_preview)
+    # (Empty State Note: When no session is selected or a session has no scripts, the preview shows blank.
+    #  Consider displaying a placeholder message like "Select a script to preview its contents" instead
+    #  of an empty pane to guide users on what to do next.)
 
     right_splitter.addWidget(preview_widget)
     # Line note: Set default height ratio between top list box (260px) and bottom preview pane (360px).
     # Height parameters: Top script list box 260px; Bottom code preview box 360px.
     # Tester values: [200, 420] more preview space; [320, 300] balanced; controller drags override these at runtime.
     right_splitter.setSizes([260, 360])
+    # (UX Note: The splitter positions are not persisted between app restarts. Users who adjust the layout
+    #  will have it reset each time. Consider saving splitter geometry in QSettings and restoring on startup.)
 
     right_layout.addWidget(right_splitter)
-    
+
     # Line note: Return completed panel container.
     return right_group
