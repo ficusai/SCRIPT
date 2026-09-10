@@ -1,5 +1,14 @@
 """
 Checks if a session ID has been exported.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (Cache file storage format)
+- Formats Handled: Plain text session ID strings (e.g. UUID, timestamped session keys)
+- Export Modes Supported: Fast set-based session export verification
+- Framework Possibilities:
+    - CLI: Skip already exported sessions during bulk export command execution
+    - REST APIs (FastAPI / Flask): Middleware or route level query to avoid repeating work
+    - Background Workers: Task deduplication filter before scheduling extraction tasks
 """
 
 from __future__ import annotations
@@ -32,8 +41,22 @@ from opencode_extractor.cache.load_exported_session_ids import load_exported_ses
 # Edge Cases:
 #   - Cache file is unreadable, missing, or corrupted -> Returns False cleanly because load_exported_session_ids returns an empty set.
 #   - Cache whose "exported_sessions" value is not a dictionary -> load_export_cache returns {} -> False.
+# Testing Steps:
+#   - Step 1: Call `is_session_exported("non_existent_id")` -> expect `False`
+#   - Step 2: Mark session exported using `mark_session_exported("test_id")`
+#   - Step 3: Call `is_session_exported("test_id")` -> expect `True`
 def is_session_exported(session_id: str) -> bool:
-    # Load all previously saved session IDs into memory.
+    # Load all previously saved session IDs into memory as a Python set object.
+    # Variable Type: Set[str]
+    # Default: Empty set `set()` if cache file is missing or invalid
+    # Options & Concrete Values: {"sess_01", "sess_02"}
+    # Errors/Edge Cases: Handled internally by load_exported_session_ids()
+    # Testing Step: Inspect contents of exported set via Python shell
     exported = load_exported_session_ids()
+
     # Return True if session_id is in the set of exported IDs, otherwise False.
+    # Expression Type: bool (True or False)
+    # Output: True if present in set, False otherwise
+    # Testing Step: Assert boolean return value against known cache state
     return session_id in exported
+
