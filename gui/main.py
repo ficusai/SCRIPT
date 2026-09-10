@@ -30,10 +30,27 @@ from gui.main_window import MainWindow
 #   - If PyQt6 is missing, the `from PyQt6.QtWidgets import QApplication` import at module top raises
 #     ModuleNotFoundError before main() is ever called.
 def main():
-    # Line note: Create the underlying desktop application object using any command line arguments passed in.
-    # Parameter choices: sys.argv accepts standard PyQt command line arguments like `-platform offscreen` or `-style fusion`.
-    # Tester options: pass `-platform offscreen` (headless), `-style fusion` (non-native look),
-    # `-stylesheet style.qss` (extra styling layered over DARK_STYLESHEET), or `-reverse` (right-to-left direction).
+    # (DevOps Note: No --headless / --platform offscreen flag is exposed to the user.
+    #  To run in CI or headless environments, the operator must inject QT_QPA_PLATFORM=offscreen
+    #  into the environment before launching, or pass -platform offscreen via sys.argv manually.
+    #  Consider adding an explicit --headless CLI flag for documented CI support.)
+    #
+    # (DevOps Note: No resource cleanup on exit (e.g., closing SQLite connections, releasing file locks).
+    #  If the application is terminated abnormally (SIGKILL, OOM-kill), SQLite journal/WAL files
+    #  may be left in an inconsistent state requiring manual recovery. Register atexit handlers
+    #  to ensure graceful shutdown.)
+    #
+    # (DevOps Note: No fallback display or error-reporting mode when X11/Wayland is unavailable.
+    #  The app crashes immediately with "Could not connect to display" instead of printing a
+    #  helpful message suggesting `QT_QPA_PLATFORM=offscreen` or installing xvfb-run.)
+    #
+    # (DevOps Note: No log file path or log rotation is configured. Runtime errors and warnings
+    #  are only visible in the terminal that launched the process. For production deployments,
+    #  add logging.FileHandler to a standard location (~/.local/share/opencode-script-extractor/log/)
+    #  with rotation (logging.handlers.RotatingFileHandler).)
+    #
+    # (DevOps Note: Missing version pinning for PyQt6 — the minimum supported version is not declared.
+    #  Ensure a requirements.txt specifies PyQt6>=6.4 to guarantee available APIs.)
     app = QApplication(sys.argv)
     # Line note: Set the official application name displayed by the desktop environment window manager.
     # Application metadata string used by desktop environment window managers.
