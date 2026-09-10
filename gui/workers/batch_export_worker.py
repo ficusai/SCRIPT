@@ -1,3 +1,8 @@
+# Module note: Batch Export Background QThread Worker.
+# Purpose: Executes batch exports for multiple session bundles to disk on a background QThread.
+# Plain-language overexplanation for beginners:
+# Saving many session transcripts and script files to disk can take several seconds. This worker runs the file saving tasks on a separate background thread so the main window user interface remains completely smooth, responsive, and unblocked.
+
 from typing import Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 from opencode_extractor import OpenCodeExtractor, export_session_bundles
