@@ -1,5 +1,14 @@
 """
 Marks multiple sessions as exported in persistent cache.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (Cache data store format)
+- Formats Handled: JSON UTF-8 payload with batch dictionary mapping
+- Export Modes Supported: Batch session cache marking (multiple records per call)
+- Framework Possibilities:
+    - CLI: Bulk cache update after completing directory/session exports
+    - Async Processing (Celery/RQ): Update cache state after completing batch worker tasks
+    - Web API: Batch import endpoint updating local cache state in bulk
 """
 
 from __future__ import annotations
@@ -54,32 +63,56 @@ from opencode_extractor.cache.load_export_cache import load_export_cache
 #   - Existing cache entries NOT mentioned in the batch are preserved (merge, not replace).
 #   - Disk write or file permission errors: Exception caught by try/except, preventing crash.
 #   - Directory creation failure (ensure_cache_dir): propagates (not caught here).
+# Testing Steps:
+#   - Call `mark_multiple_sessions_exported([{"session_id": "sess_b1", "output_path": "/tmp/b1"}])`
+#   - Verify `is_session_exported("sess_b1")` returns `True`
 def mark_multiple_sessions_exported(records: list) -> None:
     # Ensure the target directory for the cache exists.
+    # Side Effect: Creates directory ~/.local/share/opencode if not existing
     ensure_cache_dir()
+
     # Read existing session entries from the cache file.
+    # Variable Type: Dict[str, Dict[str, Any]]
     cache = load_export_cache()
+
     # Get the current date and time formatted as a standard ISO string.
+    # Variable Type: str (ISO 8601 format e.g. "2026-09-10T14:30:00.123456")
     now_iso = _dt.datetime.now().isoformat()
+
     # Loop through each record in the list and update the cache dictionary.
+    # Iteration Type: list of dict records
+    # Valid Rec Keys: "session_id" (str), "output_path" (str), "script_count" (int), "tool_call_count" (int)
     for rec in records:
+        # Extract session_id from record dictionary
+        # Variable Type: Optional[str]
         sid = rec.get("session_id")
+
+        # Skip record if session_id is None, empty string, or missing
         if sid:
+            # Build metadata dictionary and assign to cache map
+            # Output: New or updated dict entry in `cache` map keyed by `sid`
             cache[sid] = {
                 "exported_at": now_iso,
                 "output_path": rec.get("output_path", ""),
                 "script_count": rec.get("script_count", 0),
                 "tool_call_count": rec.get("tool_call_count", 0),
             }
+
     # Prepare the payload object with cache version, update timestamp, and session dictionary.
+    # Variable Type: dict
+    # Keys: "version" (int=1), "last_updated" (str ISO 8601), "exported_sessions" (dict)
     payload = {
         "version": 1,
         "last_updated": now_iso,
         "exported_sessions": cache,
     }
+
     try:
         # Save the updated payload back into the JSON cache file with clean formatting.
+        # Side Effect: Overwrites exported_sessions.json on disk with 2-space indented JSON
+        # Errors Swallowed: OSError, PermissionError, IOError
         CACHE_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     except Exception:
         # Ignore any file write errors to prevent the application from crashing.
         pass
+
