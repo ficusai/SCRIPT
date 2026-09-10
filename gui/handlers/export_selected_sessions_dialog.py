@@ -1,3 +1,9 @@
+# Module note: Export Selected Sessions Dialog Handler.
+# Purpose: Opens native folder chooser dialog and launches background BatchExportWorker thread.
+# Plain-language overexplanation for beginners:
+# This file handles what happens when the user clicks the "Export Selected Sessions" button.
+# It checks which sessions are selected, asks the user where to save the files, and starts a background process to save transcripts and script files to disk.
+
 import os
 from PyQt6.QtWidgets import QMessageBox, QFileDialog
 from gui.handlers.get_selected_session_ids import get_selected_session_ids
