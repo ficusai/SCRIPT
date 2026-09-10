@@ -1,3 +1,8 @@
+# Module note: Select All Sessions Event Handler.
+# Purpose: Checks every visible session row checkbox in the main session table.
+# Plain-language overexplanation for beginners:
+# When the user clicks the "Select All Sessions" button above the session table, this handler loops through all visible table rows and checks their checkboxes, then updates summary labels and export button text.
+
 from PyQt6.QtCore import Qt
 from gui.handlers.update_selected_sessions_count import update_selected_sessions_count
 
