@@ -123,7 +123,7 @@ def export_selected_sessions_dialog(window):
     )
     # Step 9: Connect worker signals to main thread callback handlers.
     window.batch_thread.progress_signal.connect(lambda cur, tot, txt: on_batch_progress(window, cur, tot, txt))
-    window.batch_thread.finished_signal.connect(lambda sc, tc, out: on_batch_finished(window, sc, tc, out))
+    window.batch_thread.finished_signal.connect(lambda sess_cnt, sc, tc, out: on_batch_finished(window, sess_cnt, sc, tc, out))
     window.batch_thread.error_signal.connect(lambda err: on_batch_error(window, err))
     # Step 10: Start background execution on QThread.
     window.batch_thread.start()

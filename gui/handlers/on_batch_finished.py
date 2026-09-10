@@ -5,7 +5,6 @@
 
 from PyQt6.QtWidgets import QMessageBox
 from opencode_extractor import load_exported_session_ids
-from gui.handlers.get_selected_session_ids import get_selected_session_ids
 from gui.handlers.filter_sessions import filter_sessions
 
 
@@ -29,7 +28,7 @@ from gui.handlers.filter_sessions import filter_sessions
 # - scripts_cnt = 0, tools_cnt = 0 (empty session bundle exported; verify summary dialog displays zeros accurately).
 # - Out path contains spaces or non-ASCII characters e.g. "/home/user/Desktop/My Exports/Session Extracted" (verify path is displayed cleanly).
 # - ZIP export mode output (out_path points to .zip archive file; verify path ends with .zip extension in info dialog).
-def on_batch_finished(window, scripts_cnt: int, tools_cnt: int, out_path: str):
+def on_batch_finished(window, sessions_cnt: int, scripts_cnt: int, tools_cnt: int, out_path: str):
     # Step 1: Hide loading progress bar.
     window.progress_bar.setVisible(False)
     # Step 2: Re-enable export and refresh buttons for user interaction.
@@ -37,8 +36,6 @@ def on_batch_finished(window, scripts_cnt: int, tools_cnt: int, out_path: str):
     window.refresh_btn.setEnabled(True)
     # Step 3: Update status bar text message with output directory location.
     window.status_lbl.setText(f"Export complete: {out_path}")
-    sids = get_selected_session_ids(window)
-
     # Step 4: Reload set of exported session IDs from persistent disk tracking file.
     window.exported_sids = load_exported_session_ids()
     # Step 5: Refresh table row views so newly exported sessions display green "✓ EXPORTED" status badges.
@@ -48,7 +45,7 @@ def on_batch_finished(window, scripts_cnt: int, tools_cnt: int, out_path: str):
     QMessageBox.information(
         window,
         "Batch Export Complete",
-        f"Successfully exported {len(sids)} session(s) to disk!\n\n"
+        f"Successfully exported {sessions_cnt} session(s) to disk!\n\n"
         f"📁 Output Location:\n{out_path}\n\n"
         f"📄 Script & Code Files: {scripts_cnt}\n"
         f"🛠️ Tool Calls & Logs: {tools_cnt}",

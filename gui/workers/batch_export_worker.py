@@ -35,8 +35,8 @@ from opencode_extractor import OpenCodeExtractor, export_session_bundles
 class BatchExportWorker(QThread):
     # Signal emitted periodically to report progress (current step, total steps, description text).
     progress_signal = pyqtSignal(int, int, str)
-    # Signal emitted when batch export finishes (script count, tool call count, output directory path).
-    finished_signal = pyqtSignal(int, int, str)
+    # Signal emitted when batch export finishes (session count, script count, tool call count, output directory path).
+    finished_signal = pyqtSignal(int, int, int, str)
     # Signal emitted when an error occurs, passing the error description text string.
     error_signal = pyqtSignal(str)
 
@@ -126,8 +126,8 @@ class BatchExportWorker(QThread):
                     create_subfolder=self.create_subfolder,
                 )
                 # Step 5: Emit completion signal with summary stats to trigger on_batch_finished handler on main thread.
-                # Signal payload: (scripts_count: int, tool_calls_count: int, output_path: str)
-                self.finished_signal.emit(s_cnt, t_cnt, out_path)
+                # Signal payload: (session_count: int, scripts_count: int, tool_calls_count: int, output_path: str)
+                self.finished_signal.emit(len(bundles), s_cnt, t_cnt, out_path)
         except Exception as e:
             # Exception Handling & UI Cleanup:
             # Captures write permission errors, missing directory errors, or out-of-disk-space exceptions.

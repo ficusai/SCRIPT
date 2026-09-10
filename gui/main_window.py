@@ -123,6 +123,9 @@ class MainWindow(QMainWindow):
         # Valid state value: Session UUID string (e.g. "ses_01h8x2k3...") or None if no session selected.
         # Written by on_session_selected; the duplicate-selection guard compares against it.
         self.current_session_id: Optional[str] = None
+        # Line note: Request counter for guarding against stale extraction results.
+        # Incremented on each session selection; callbacks must match to process results.
+        self._extract_req_counter: int = 0
         # Line note: Store extracted script artifacts from the currently viewed session.
         # Valid state value: List of ScriptArtifact objects containing code text, path, and language type.
         self.extracted_scripts: List[ScriptArtifact] = []

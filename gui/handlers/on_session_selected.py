@@ -54,11 +54,24 @@ def on_session_selected(window):
 
     # Step 7: Launch background worker thread to extract scripts for this session ID.
     # Testing values: session_id="ses_12345678", window.current_db_path="all".
+    # Race guard: increment request counter to detect and discard stale results.
+    window._extract_req_counter += 1
+    current_req = window._extract_req_counter
     window.extract_thread = ExtractWorker(session_id, window.current_db_path)
     # Step 8: Connect completion and failure signals to main thread callback handlers.
-    window.extract_thread.finished_signal.connect(lambda scripts: on_scripts_extracted(window, scripts))
+    # The lambda captures current_req to verify this result is still the latest request.
+    window.extract_thread.finished_signal.connect(
+        lambda scripts, req=current_req: on_scripts_extracted_guarded(window, scripts, req)
+    )
     window.extract_thread.error_signal.connect(lambda err_msg: on_extract_error(window, err_msg))
     window.extract_thread.start()
+
+
+def on_scripts_extracted_guarded(window, scripts, req_id):
+    """Discard stale extraction results if a newer session was selected while this one was running."""
+    if req_id != window._extract_req_counter:
+        return
+    on_scripts_extracted(window, scripts)
 
 # ADDITIONAL DOCUMENTATION - FULL CONTRACT
 #
