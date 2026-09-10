@@ -102,6 +102,22 @@ class OpenCodeExtractor:
     #  The caller gets an empty result set instead of an informative error. Consider adding validation
     #  that rejects non-.db/.sqlite paths with kind="sqlite".)
     #
+    # (Security Note: Hardcoded Database Paths - DB_CANDIDATE_PATHS scans predefined locations including
+    #  ~/.local/share/opencode/, Flatpak sandbox paths, and /run/media/ external drives. These paths are
+    #  evaluated by glob.glob() at import time for tilde-expanded entries, exposing the user's home
+    #  directory structure. An attacker with read access to these locations can enumerate session IDs
+    #  and potentially extract sensitive conversation data.)
+    #
+    # (Security Note: SQL Injection - The SQL query "SELECT COUNT(*) FROM session" uses no user input
+    #  and is a static string, so it is not vulnerable to SQL injection. However, if future code adds
+    #  dynamic table names or WHERE clauses, parameterized queries MUST be used. Table names cannot
+    #  be parameterized in SQLite; use an allowlist instead.)
+    #
+    # (Security Note: Unvalidated SQLite Connection - connect_sqlite() opens databases with mode=ro
+    #  (read-only URI) which prevents writes. However, if this mode is ever changed, an attacker
+    #  who can inject path strings into db_path could force writes to arbitrary .db files if the
+    #  process has write permissions. (CWE-94: Improper Control of Generation of Code))
+    #
     # (DevOps Note: No signal handlers (SIGTERM/SIGHUP) are registered. On Linux systems that send
     #  SIGTERM to child processes (e.g., systemd, Docker), connections may be left open and SQLite
     #  WAL files unreleased. Register atexit handlers or signal handlers to call close() gracefully.)
