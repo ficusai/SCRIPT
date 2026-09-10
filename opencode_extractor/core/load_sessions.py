@@ -45,29 +45,45 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #    - If parent_id references a session not in the loaded set: subagent_count is not incremented for anyone
 #    - Empty db_sources list: returns {} immediately after the loop finishes
 #
-#  How to test:
-#    - Test with a single SQLite DB containing one session: should return {sid: SessionInfo}
-#    - Test with an empty db_sources list: should return {}
-#    - Test with duplicate session IDs across two sources: first source's record is kept
-#    - Test with a corrupt SQLite DB in the list: should skip it and continue with other sources
-# )
+#  Data Integrity Considerations:
+#    - SQLite schema assumed: table "session" with columns (id, title, agent, model, directory, parent_id, time_created, time_updated)
+#    - Column types: id=TEXT, title=TEXT, agent=TEXT, model=TEXT, directory=TEXT, parent_id=TEXT (nullable), time_created=REAL (nullable), time_updated=REAL (nullable)
+#    - NULL handling: `r["column"] or ""` coerces NULL to ""; `r["parent_id"] or None` coerces NULL/"" to None
+#    - Timestamp coercion: parse_ts() handles both REAL (seconds) and INTEGER (milliseconds) SQLite values
+#    - Lost data: First-wins deduplication means later sources' sessions are silently dropped
+#    - Error swallowing: `except Exception: continue` hides ALL SQLite errors including schema mismatches
+#    - Subagent counting: Only direct children counted; transitive descendants not tracked
+#    - Encoding: SQLite TEXT columns assumed UTF-8; invalid bytes handled by SQLite's internal encoding
+# (Data Note: Multi-source session loader. The SQLite query selects all columns in a fixed order matching
+#  SessionInfo constructor. Schema changes to the 'session' table (added/removed/reordered columns) will
+#  cause silent data misalignment. The query does not use WHERE clauses, so all sessions including
+#  deleted/purged sessions are loaded. The text dump path uses load_text_dump_sessions() which applies
+#  different defaults (agent="build", model="opencode-dump") and does not parse timestamps.)
 def load_sessions(
     # (Parameter note: List of DatabaseSource objects specifying which SQLite or text dump files to read.
     #  Each DatabaseSource has fields: label (str), path (str), size_mb (float), kind (str).
     #  kind must be "sqlite" or "text_dump".
     #  Example: [DatabaseSource(label="primary", path="/home/user/.local/share/opencode/opencode.db", size_mb=1.2, kind="sqlite")]
     #  Edge case: Passing an empty list [] causes the function to return an empty dict {} with no errors.
+    # (Performance Note: No batch limit on db_sources iteration. If dozens of large SQLite databases are
+    #  passed, each is opened sequentially and all session rows are loaded into memory. Consider lazy-loading
+    #  sessions per-source or streaming for datasets >100k sessions.)
     db_sources: List[DatabaseSource],
     # (Parameter note: Cache dictionary of open SQLite connections keyed by file path.
     #  Prevents reopening the same database file multiple times.
     #  Example: {"opencode.db": <sqlite3.Connection object>}
     #  Edge case: Passing an empty dict {} is fine; connections are added lazily via connect_sqlite().
+    # (Performance Note: Connection pool has no size limit. With many distinct database paths, this dict
+    #  grows unboundedly. Consider adding an LRU eviction policy or max-pool-size constant.)
     conns: Dict[str, sqlite3.Connection],
     # (Parameter note: Shared dictionary for storing parsed text dump step rows.
     #  Keyed by session ID string, value is a list of (message_id, parsed_json_dict) tuples.
     #  Mutated in-place so the caller can access the parsed parts after this call returns.
     #  Example: {"sess_01": [("msg_01", {"type": "tool", ...}), ("msg_02", {"type": "tool", ...})]}
     #  Edge case: Passing an empty dict {} is fine; it is populated by load_text_dump_sessions() internally.
+    # (Performance Note: Text dump parts are fully materialized in memory. A large .txt dump (hundreds of MB)
+    #  will hold all JSON payloads as Python dicts simultaneously. For very large dumps, consider streaming
+    #  or lazy-loading parts on demand.)
     text_parts: Dict[str, List[Tuple[str, dict]]],
 ) -> Dict[str, SessionInfo]:
     # (Line note: Initialize an empty dictionary that will hold all loaded session records.
@@ -96,6 +112,11 @@ def load_sessions(
                     "SELECT id, title, agent, model, directory, parent_id, "
                     "time_created, time_updated FROM session"
                 ).fetchall()
+                # (Performance Note: This query does NOT use an index hint. If the 'session' table lacks an index
+                #  on (parent_id, time_created), subagent lookups and sorted queries will perform full table scans.
+                #  Consider ensuring an index exists: CREATE INDEX IF NOT EXISTS idx_session_parent ON session(parent_id);
+                #  Also, fetchall() loads ALL rows into Python memory at once. For databases with >500k sessions,
+                #  use cursor iteration or LIMIT/OFFSET pagination to reduce peak memory.)
                 # (Line note: Iterate over each row returned by the SQL query.
                 #  Each row is a sqlite3.Row object that supports both index and column-name access.
                 for r in rows:
@@ -159,6 +180,11 @@ def load_sessions(
     # (Line note: Post-processing pass - count how many direct child subagents each session has.
     #  This requires a second pass because subagent relationships are defined by parent_id fields.
     #  We cannot count during the initial load because parent sessions may appear after their children in the data.
+    # (Performance Note: Two sequential O(N) passes over sessions.values() are required for subagent counting.
+    #  For very large session sets (>1M records), this doubles the pass overhead. A single-pass approach using
+    #  a defaultdict(int) with a deferred apply step could reduce constant factors. The counts dict is also
+    #  unbounded — consider filtering to only sessions that exist in the sessions dict during the second pass
+    #  to avoid allocating entries for dangling parent_id references.)
     counts: Dict[str, int] = {}
     for sess in sessions.values():
         # (Line note: Only sessions with a non-None parent_id are counted as children.
