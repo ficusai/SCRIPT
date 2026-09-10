@@ -57,6 +57,9 @@ def count_session_files(extractor) -> Dict[str, int]:
 
     # Fetch all top-level root sessions from database sources
     # Variable Type: List[SessionInfo]
+    # (Performance Note: root_sessions() triggers all_sessions() which sorts ALL sessions (including subagents)
+    #  just to filter roots. For large datasets, this is an O(N log N) operation where N is total sessions.
+    #  A dedicated "SELECT * FROM session WHERE parent_id IS NULL" query would be O(N) and avoid the sort.)
     roots = extractor.root_sessions()
 
     # Loop through each root session to extract and count its scripts.
@@ -64,6 +67,10 @@ def count_session_files(extractor) -> Dict[str, int]:
         try:
             # Extract script list for current root session ID
             # Variable Type: List[ScriptArtifact]
+            # (Performance Note: extract_scripts() is called once per root session. Each call re-parses all part
+            #  JSON rows for that session tree from scratch. With K root sessions each having M parts on average,
+            #  total work is O(K * M). The parsed parts are NOT shared across sessions. Consider a unified parts
+            #  parsing pass that computes counts for all sessions in a single sweep.)
             scripts = extractor.extract_scripts(r.id)
             file_counts[r.id] = len(scripts)
         except Exception:
