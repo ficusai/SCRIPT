@@ -1,3 +1,9 @@
+# Module note: Session Table Component Builder.
+# Purpose: Constructs and returns the left group panel containing the session table and selection control buttons.
+# Plain-language overexplanation for beginners:
+# This file builds the session conversation table on the left side of the main window.
+# It displays session creation dates, agent names, script counts, export statuses, and titles in an interactive table grid with checkboxes.
+
 # Line note: Import UI widgets (group boxes, layout containers, labels, buttons, tables, headers) from PyQt6.
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget, QHeaderView
 # Line note: Import core Qt constants.
