@@ -2,99 +2,48 @@
 Pattern for detecting script execution commands in terminal actions.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import regular expression module re for compiled regex pattern matching
 import re
 
-# A search pattern (regex) that finds command line instructions executing code files (for example `python main.py` or `bash script.sh`).
-# Data type: Compiled Regex Pattern Object (re.Pattern)
+# Module Purpose & Overview:
+# Defines a compiled regular expression object (EXEC_RE) used to scan bash execution strings for commands that run code files using standard interpreters (e.g., `python3 main.py`, `bash script.sh`, `node server.js`).
 #
-# ============================================================================
-# TOKEN-BY-TOKEN PLAIN-LANGUAGE TRANSLATION
-# ============================================================================
-#   (?:python3?|bash|sh|zsh|node|ruby|perl)
-#       NON-CAPTURING interpreter alternation. 'python3?' == 'python' or 'python3'.
-#       NOTE: 'python2' is NOT matched. 'python3' IS (via the '3?' optional digit).
-#       re.I is set, so 'Python', 'PYTHON3', 'Bash', 'NODE' also match.
-#   \s+           at least one space/tab between interpreter and the rest.
-#   (?:\-[a-zA-Z]+\s+)*
-#       ZERO OR MORE single-dash, single-word flags, e.g. '-u ', '-x ', '-m ', '-e '.
-#       IMPORTANT LIMITATION: each flag must be a single '-' plus LETTERS ONLY, and must be
-#       separated by whitespace. Double-dash flags like '--trace-warnings' FAIL this group, so a
-#       command `node --trace-warnings src/index.js` does NOT match at all (verified). Long flags
-#       with digits/hyphens, e.g. '-O2 ', also fail because [a-zA-Z]+ rejects digits.
-#   ['\"]?        optional opening quote around the script path.
-#   ([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))
-#       CAPTURE GROUP 1, in two parts:
-#         [^\s'\"|&><;]+   one or more chars that are NOT space, quote, |, &, <, > or ';'.
-#                          This allows directory slashes (src/utils/parse.py) but blocks shell
-#                          metacharacters and quotes.
-#         \.               a literal dot.
-#         (?:py|sh|bash|js|ts|rb|pl|lua|php|pyw)  extension whitelist (case-insensitive thanks to re.I).
-#       The dot MUST be in the allowed character set region and the whole path must be contiguous
-#       (no spaces inside); `python3 my script.py` splits at the space and does not match.
-#   ['\"]?        optional closing quote right after the matched script path.
+# Variable Type & Flags:
+#   - Name: EXEC_RE
+#   - Type: re.Pattern (Compiled Regular Expression Pattern)
+#   - Flags: re.I (IGNORECASE - makes interpreter names and file extensions case-insensitive).
 #
-# ============================================================================
-# FLAG EFFECTS (re.I ONLY)
-# ============================================================================
-#   re.IGNORECASE: interpreter names AND the extension list AND the [a-zA-Z] flag letters all
-#                  become case-insensitive ('PYTHON3', 'SCRIPT.PY', '-X ' all fine).
-#   NO re.M / re.S: '.' inside the pattern is escaped ('\.'), and no ^/$ anchors exist, so
-#                  multiline/dotall would change nothing here anyway.
+# Token-by-Token Regular Expression Breakdown:
+#   - `(?:python3?|bash|sh|zsh|node|ruby|perl)` : Non-capturing group for interpreter names:
+#       * Python: python, python3
+#       * Shell: bash, sh, zsh
+#       * Runtime / Scripting: node, ruby, perl
+#   - `\s+` : At least one whitespace character separating interpreter from options/script path.
+#   - `(?:\-[a-zA-Z]+\s+)*` : Zero or more single-dash command-line flags (e.g. `-u `, `-x `, `-e `).
+#   - `['\"]?` : Optional opening quote around script path.
+#   - `([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))` : CAPTURE GROUP 1 (Target script path ending in supported extension):
+#       * Supported extensions: .py, .sh, .bash, .js, .ts, .rb, .pl, .lua, .php, .pyw
+#   - `['\"]?` : Optional closing quote around script path.
 #
-# ============================================================================
-# VERIFIED MATCH EXAMPLES (group1 = matched script path)
-# ============================================================================
-#   1. python3 main.py                  -> 'main.py'
-#   2. bash scripts/deploy.sh           -> 'scripts/deploy.sh'
-#   3. sh run_all.sh                    -> 'run_all.sh'
-#   4. zsh env.sh                       -> 'env.sh'
-#   5. node server.js                   -> 'server.js'
-#   6. ruby script.rb                   -> 'script.rb'
-#   7. perl process.pl                  -> 'process.pl'
-#   8. bash -x -e failfast.sh           -> 'failfast.sh'          (repeated single-dash flags OK)
-#   9. python -u utils/parse.py         -> 'utils/parse.py'       ('-u ' consumed by flag group)
-#  10. Python3 Script.PY                -> 'Script.PY'            (case-insensitive interpreter+ext)
-#   11. bash "quoted.sh"                 -> 'quoted.sh'            (quote chars not part of capture)
+# Capture Group Output:
+#   - Group 1: Executed script path string (e.g., "main.py", "scripts/deploy.sh", "server.js")
 #
-# ============================================================================
-# VERIFIED NON-MATCH EXAMPLES (why each fails)
-# ============================================================================
-#   1. node --trace-warnings src/index.js   -> the '--trace-warnings' token cannot be consumed:
-#      the flag group only accepts '-<letters> '; group1 cannot start with a '-'... actually the
-#      engine positions group1 at '-...' which contains no '.' before a space, so no extension
-#      match is possible. NO MATCH (verified) - the old header example claiming a match is wrong.
-#   2. python3 -m unittest test_runner.py   -> '-m ' IS consumed by the flag group, but then
-#      group1 must immediately hit 'ext'; 'unittest' has no dot, and the engine cannot jump past
-#      it to 'test_runner.py'. NO MATCH (verified) - this string is documented only as a "sample".
-#   3. python3 script.txt                   -> target has no whitelisted extension ('txt' absent).
-#   4. python3 main.py -o out.txt           -> group1 = 'main.py' matches; this string DOES match
-#      (trailing arguments are simply ignored) - included to contrast with the no-match cases.
-#   5. cmd /c run.bat                       -> 'cmd' is not in the interpreter alternation; and
-#      even if it were, 'bat' is not in the extension whitelist.
+# Verified Matches & Non-Matches:
+#   - Match: python3 main.py -> Group 1: "main.py"
+#   - Match: bash -x scripts/deploy.sh -> Group 1: "scripts/deploy.sh"
+#   - Match: node server.js -> Group 1: "server.js"
+#   - Non-match: python3 script.txt -> Extension .txt is not in supported extension list.
 #
-# ============================================================================
-# BOUNDARY & EDGE CASES
-# ============================================================================
-#   - Group1 keeps directory structure and original case: 'Python3 Script.PY' -> 'Script.PY'
-#     (case is preserved, only matching becomes case-insensitive).
-#   - Consumer behavior: parse_bash_artifacts strips group1, strips surrounding quotes, then calls
-#     read_disk_content(path) to fill `content` (empty string if the file is gone). artifact
-#     source_kind = 'bash_exec', content = file bytes as text (or "").
-#   - Because the interpreter alternation is NOT anchored, the regex can match inside a longer
-#     command (e.g. `cd /tmp && bash run.sh` still yields 'run.sh' at the first position where an
-#     interpreter + whitelisted ext align).
-#   - Group 1 greediness: `python3 a.py b.py` captures 'a.py' (first valid path).
-#
-# SAMPLE TERMINAL COMMAND STRINGS FOR TESTING REGEX:
-#   - `python3 -m unittest test_runner.py`   (NOTE: does NOT match; see above)
-#   - `sh run_all.sh`
-#   - `ruby script.rb`
-#   - `perl process.pl`
-# SUPPORTED FILE EXTENSIONS IN PATTERN:
-#   - .py, .pyw, .sh, .bash, .js, .ts, .rb, .pl, .lua, .php
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.constants.exec_re import EXEC_RE; m = EXEC_RE.search("python3 main.py"); print(m.group(1) if m else None)' (outputs "main.py")
+
+# Constant definition: Compiled regex matching script execution commands in terminal actions
 EXEC_RE = re.compile(
+    # Pattern string: Matches interpreter name, optional flags, and script path with whitelisted extension
     r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-[a-zA-Z]+\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
+    # Flag: IGNORECASE (re.I)
     re.I,
 )
