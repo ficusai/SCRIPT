@@ -160,6 +160,20 @@ def mark_session_exported(
     #    - "script_count": int (Total scripts exported in this session)
     #    - "tool_call_count": int (Total tool calls recorded in this session)
     #  If session_id already existed, this FULLY REPLACES the old metadata dict (not a merge).
+    # (Data Architecture Note: The cache update pattern is read-modify-write without locking.
+    #  Two concurrent calls can interleave: read -> read -> write A -> write B (B wins, A's update lost).
+    #  The atomic tmp+replace prevents FILE CORRUPTION (torn writes) but does NOT prevent DATA LOSS
+    #  of concurrent updates. For single-process CLI usage this is acceptable; for multi-process
+    #  scenarios, consider using file-level locking (fcntl.flock) or a SQLite-backed cache.)
+    #
+    #  Cache record structure per session_id:
+    #    {
+    #      "exported_at": ISO8601,      # When this export occurred
+    #      "output_path": str,          # Directory where export was written
+    #      "script_count": int,         # Number of script files in export
+    #      "tool_call_count": int       # Number of tool calls in session
+    #    }
+    #  If session_id already exists, the entire metadata dict is REPLACED (not merged).
     cache[session_id] = {
         "exported_at": _dt.datetime.now().isoformat(),
         "output_path": output_path,

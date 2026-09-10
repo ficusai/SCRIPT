@@ -120,6 +120,15 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #   11. Dedup by filePath only: bash artifact does NOT overwrite existing write/edit entry for same path.
 #   Run: python3 -m pytest tests/test_extract_scripts.py -v
 # )
+# (Data Architecture Note: extract_scripts is the most complex extraction pipeline. It handles four
+#  distinct artifact sources (write, edit, bash_heredoc, bash_echo/bash_exec/bash_inline) plus an
+#  on_disk fallback. The output list is deduplicated by filePath (first-seen wins for bash artifacts;
+#  write/edit artifacts for the same path may coexist if they have different source_kinds).
+#  Content backfilling (step 4) reads files from disk — this means the extracted bundle reflects the
+#  state of the filesystem AT EXTRACTION TIME, not necessarily the state at session end.
+#  The on_disk fallback source_kind means artifact content may be staler than the session itself.
+#  The sort is stable and case-insensitive by filePath; two artifacts with paths differing only in
+#  case (e.g. "README.md" vs "readme.md") are treated as separate entries.)
 def extract_scripts(extractor, root_session_id: str, include_errors: bool = False) -> List[ScriptArtifact]:
     # Retrieve the hierarchy of sessions including the root and subagents.
     # Returns RootTree object with `members` and `all_ids` properties

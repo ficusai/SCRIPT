@@ -161,6 +161,37 @@ from opencode_extractor.utils.safe_name import safe_name
 #     - Last write wins for duplicate paths within a bundle
 #     - ZIP mode: both entries exist, last wins on extraction
 #   Stability: STABLE PUBLIC API)
+# (Data Architecture Note: Export bundle orchestrator. Coordinates directory/file creation, script writing,
+#  tool call serialization, ZIP packaging, and cache updates.
+#
+#  DATA FLOW:
+#    For each bundle in bundles (order = list order):
+#      1. resolve_export_path() -> target_dir (str)
+#      2. Create directory (mkdir exist_ok=True)
+#      3. Write scripts/*.py (or scripts/*.ts etc.) — only in multi-bundle mode OR single mode with tool_calls
+#      4. Write session_info.json from format_session_info_json()
+#      5. Write tool_calls.json from format_tool_calls_json() — ONLY if export_tool_calls=True
+#      6. Write SUMMARY.md and tool_calls_transcript.md — ONLY if export_tool_calls=True
+#      7. Write patches/ — ONLY if export_tool_calls=True
+#      8. Optionally create ZIP archive with ZIP_DEFLATED compression
+#      9. Update export cache via mark_session_exported()
+#
+#  FILE WRITE MODES:
+#    - Disk mode: UTF-8 with errors="replace" for all text writes
+#    - ZIP mode: in-memory BytesIO; scripts use ZIP_DEFLATED; text files use deflated compression
+#    - Patch files: written as raw text with LF line endings regardless of platform
+#
+#  CACHE INTEGRITY:
+#    mark_session_exported() is called AFTER all files are written (even if ZIP creation fails).
+#    If the export partially fails (e.g. disk full), the cache will be marked as exported but
+#    files may be incomplete. No rollback mechanism exists.
+#
+#  EDGE CASES:
+#    - scripts=None and tool_calls=[]: bundle still gets session_info.json and empty exports
+#    - bundle.session.time_created is None: subfolder uses "nodate" timestamp component
+#    - create_zip=True + create_subfolder=False: zip uses folder_name as top-level prefix, no per-session subdir
+#    - Empty bundles list: creates folder with no files and no ZIP; marks nothing in cache
+#  )
 def export_session_bundles(
     # (Parameter note: List of SessionExportBundle objects to export. Each bundle contains a session,
     #  its subagents, script artifacts, and tool call artifacts.

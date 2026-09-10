@@ -93,6 +93,9 @@ def load_sessions(
     # (Performance Note: No batch limit on db_sources iteration. If dozens of large SQLite databases are
     #  passed, each is opened sequentially and all session rows are loaded into memory. Consider lazy-loading
     #  sessions per-source or streaming for datasets >100k sessions.)
+    # (Data Architecture Note: The sessions dict uses first-wins deduplication by session ID. If the same
+    #  session ID appears in multiple database sources, the FIRST source's data is kept and subsequent
+    #  occurrences are silently dropped. Source order is determined by db_sources list order.)
     db_sources: List[DatabaseSource],
     # (Parameter note: Cache dictionary of open SQLite connections keyed by file path.
     #  Prevents reopening the same database file multiple times.

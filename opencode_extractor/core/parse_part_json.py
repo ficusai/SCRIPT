@@ -53,6 +53,12 @@ from opencode_extractor.models.database_source import DatabaseSource
 # (Data Note: JSON part parser. This is a filter function — it never raises, always skipping invalid entries.
 #  The returned list may contain duplicate session IDs if multiple database sources are queried.
 #  Downstream code must handle missing keys gracefully since no schema validation is performed here.)
+# (Data Architecture Note: parse_part_json is a pure filter function with no side effects.
+#  It transforms raw JSON strings (from fetch_part_rows) into Python dicts, dropping any invalid entries.
+#  The returned list preserves source iteration order but does NOT deduplicate — the same session ID may
+#  appear multiple times if it exists in multiple database sources. Downstream code (extract_scripts,
+#  extract_tool_calls) must handle duplicate (sid, obj) pairs. The function never raises; all errors
+#  are silently skipped to ensure robustness against corrupt or malformed JSON in the source data.)
 def parse_part_json(
     # (Parameter note: List of DatabaseSource objects specifying which databases/text dumps to read from.
     #  Each source has kind ("sqlite" or "text_dump"), path, label, and size_mb.
