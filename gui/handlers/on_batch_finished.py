@@ -1,3 +1,8 @@
+# Module note: Batch Export Finished Handler Callback.
+# Purpose: Handles successful completion of batch export background operations.
+# Plain-language overexplanation for beginners:
+# When saving files finishes successfully, this callback updates the GUI, marks sessions as exported with green badges, and shows a summary popup listing total files and save locations.
+
 from PyQt6.QtWidgets import QMessageBox
 from opencode_extractor import load_exported_session_ids
 from gui.handlers.get_selected_session_ids import get_selected_session_ids
