@@ -2,137 +2,122 @@
 Holds extracted script artifact content and metadata.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import datetime module as _dt for timestamp representation
 import datetime as _dt
+
+# Import dataclass and field utilities for dataclass attribute definitions
 from dataclasses import dataclass, field
+
+# Import List, Optional, Tuple type hints
 from typing import List, Optional, Tuple
 
+# Import EXT_LABEL dictionary mapping file extensions to visual display names and icons
 from opencode_extractor.constants.ext_label import EXT_LABEL
 
 
-# A data container holding code content, file path info, and history records for a script file saved from an AI session.
+# Class Purpose & Overview:
+# Data container holding code content, file path info, modification history, and metadata for a script file extracted from an AI session.
 #
-# ============================================================================
-# FIELD-BY-FIELD SPECIFICATION
-# ============================================================================
-#   Field          Python type               Required?  Default         Valid test values
-#   -----          -----------               --------   -------         ----------------
-#   filePath       str                       YES        (none)          "src/main.py", "/abs/path/tool.sh"
-#   basename       str                       YES        (none)          "main.py", "tool.sh"
-#   extension      str                       YES        (none)          "py", "sh", "bash", "js", "ts"
-#   kind           str                       YES        (none)          see below ("script/config/doc" intent;
-#                                                                       actual code fills EXT_LABEL icon strings)
-#   primary_tool   str                       YES        (none)          "write" | "edit" | "bash"    (see pipeline)
-#   source_kind    str                       YES        (none)          "write_content", "patches_only",
-#                                                                      "bash_heredoc", "bash_echo",
-#                                                                      "bash_exec", "bash_inline", "on_disk"
-#   session_id     str                       YES        (none)          "sess_01HJ89XYZ"
-#   session_agent  str                       YES        (none)          "build", "explore", "" (if unknown)
-#   session_title  str                       YES        (none)          "Fix auth bug", ""
-#   is_subagent    bool                      YES        (none)          True / False
-#   status         str                       YES        (none)          "completed", "error", "running", "pending", ""
-#   time           Optional[datetime]        YES        (none)          datetime python obj or None
-#   db_source_path str                       NO         ""              "/home/user/.local/share/opencode/opencode.db" or ""
-#   content        str                       NO         ""              "def main():\n    pass\n", ""
-#   additions      int                       NO         0               number of added LINES (see pipeline)
-#   deletions      int                       NO         0               number of removed LINES
-#   patches        List[str]                 NO         []              ["--- f\n+++ f\n-old\n+new\n", ...]
-#   edits          List[Tuple[str, str]]     NO         []              [("oldText", "newText"), ...]
+# Field Specification & Types:
+#   - filePath: str (Required) Relative or absolute file path (e.g. "src/main.py").
+#   - basename: str (Required) Isolated filename component (e.g. "main.py").
+#   - extension: str (Required) Lowercase extension string without dot (e.g. "py", "sh", "js", "ts").
+#   - kind: str (Required) Display category icon label (e.g. "🐍 Python", "🐚 Shell Script", "")
+#   - primary_tool: str (Required) Generating tool name: "write", "edit", or "bash".
+#   - source_kind: str (Required) Provenance category: "write_content", "patches_only", "bash_heredoc", "bash_echo", "bash_exec", "bash_inline", "on_disk".
+#   - session_id: str (Required) AI session ID string.
+#   - session_agent: str (Required) Agent name string (e.g. "build", "explore", "coder").
+#   - session_title: str (Required) Session title text.
+#   - is_subagent: bool (Required) True if generated in a subagent helper session; False if main session.
+#   - status: str (Required) Execution status string ("completed", "error", "running", "pending").
+#   - time: Optional[datetime] (Required) Creation/update timestamp object.
+#   - db_source_path: str (Optional, default="") Path of database containing session.
+#   - content: str (Optional, default="") Code text body content.
+#   - additions: int (Optional, default=0) Count of added code lines.
+#   - deletions: int (Optional, default=0) Count of deleted code lines.
+#   - patches: List[str] (Optional, default=[]) List of unified diff patch strings.
+#   - edits: List[Tuple[str, str]] (Optional, default=[]) List of (old_text, new_text) edit tuples.
 #
-# ============================================================================
-# HOW EACH FIELD GETS POPULATED (extraction pipeline call sites)
-# ============================================================================
-#   A) write tool (extract_scripts, source_kind="write_content"):
-#        filePath/basename/extension from the input's "filePath" (basename via rsplit("/",1));
-#        primary_tool="write"; content = input["content"] verbatim; kind =
-#        EXT_LABEL.get(file_extension(fp), ""); session_*/is_subagent/status/time/db_source_path
-#        from the step context; additions/deletions/patches/edits stay 0/[].
-#        The artifact is ALSO cached in the `written` dict for later edit-backfill.
-#   B) edit tool (extract_scripts):
-#        primary_tool="edit"; source_kind starts "patches_only"; a patch is synthesized from
-#        metadata.diff or metadata.filediff.patch, else a hand-built
-#        "--- <basename>\n+++ <basename>\n-<old>\n+<new>\n" string; each unique patch appended to
-#        patches; (old,new) search/replace pairs appended to edits; additions += max(0, new.count("\n"));
-#        deletions += max(0, old.count("\n")). If an artifact for the same filePath already exists,
-#        fields are merged into it instead of duplicating. After parsing, content is backfilled from
-#        the previously-written artifact (source_kind -> "write_content") or, failing that, from disk
-#        via read_disk_content (source_kind -> "on_disk"); otherwise content stays "".
-#   C) bash tool (parse_bash_artifacts):
-#        HEREDOC_RE   -> primary_tool="bash", source_kind="bash_heredoc", content=body+"\n"
-#        ECHO_REDIRECT_RE -> source_kind="bash_echo", content=body+"\n"
-#        EXEC_RE      -> source_kind="bash_exec", content=read_disk_content(path) or ""
-#        INLINE_PY_RE -> source_kind="bash_inline", VIRTUAL name f"inline_script_<abs(hash)%10000>.py",
-#                        extension="py", content=code+"\n" (only when len(code) > 20)
-#        All bash variants set filePath/basename/extension from the regex captures and
-#        primary_tool="bash".
-#   NOTE on `kind`: the model docstring intent is a category enum ("script"/"config"/"doc"), but NO
-#   code path assigns those literal values. In practice `kind` receives the EXT_LABEL icon string
-#   (e.g. "🐍 Python") or "" for unknown extensions. Treat the header comment as intent, not behavior.
+# Properties:
+#   - label -> str: Returns visual label string with emoji icon from EXT_LABEL dictionary, falling back to uppercased extension or "📄 FILE".
+#   - origin -> str: Returns "main session" or "<agent> subagent" depending on is_subagent flag.
 #
-# ============================================================================
-# PROPERTY: label -> str
-# ============================================================================
-#   Computation: EXT_LABEL.get(self.extension, f"📄 {self.extension.upper() or 'FILE'}")
-#   Examples (verified):
-#     extension="py"   -> "🐍 Python"
-#     extension="sh"   -> "🐚 Shell Script"
-#     extension="ts"   -> "🔷 TypeScript"
-#     extension="xyz"  -> "📄 XYZ"     (unknown -> fallback with uppercased ext)
-#     extension=""     -> "📄 FILE"    ('' or 'FILE' -> 'FILE')
-#   NOTE: extension is NOT lowercased here; callers are expected to have lowercase already
-#   (file_extension() lowercases). If you construct extension="PY" directly, EXT_LABEL lookup misses
-#   and you get "📄 PY".
-#
-# ============================================================================
-# PROPERTY: origin -> str
-# ============================================================================
-#   Computation: f"{self.session_agent} subagent" if self.is_subagent else "main session"
-#   Examples (verified):
-#     is_subagent=True,  session_agent="coder" -> "coder subagent"
-#     is_subagent=True,  session_agent=""      -> " subagent"   (leading space - cosmetic quirk)
-#     is_subagent=False, session_agent="coder" -> "main session"
-#
-# ============================================================================
-# BOUNDARY & EDGE CASE TESTS
-# ============================================================================
-#   - Empty script content `content=""`: status flag set to "partial" or empty script warning logged.
-#     (Note: content=="" alone does NOT change `status`; callers may inspect status separately.)
-#   - Unknown extension `extension="xyz"`: `label` property falls back gracefully to `📄 XYZ`.
-#   - content with only whitespace: splitlines() in the CLI yields 0 "lines" for "" but counts
-#     whitespace-only strings as 1, so "line count" in the CLI summary is whitespace-sensitive.
-#
-# SUPPORTED EXTENSIONS & TESTING VALUES:
-#   - Tested file extensions: .py, .sh, .bash, .js, .ts
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.models.script_artifact import ScriptArtifact; a = ScriptArtifact("a.py", "a.py", "py", "kind", "write", "write_content", "s1", "build", "Title", False, "completed", None); print(a.label, "|", a.origin)'
+
+# Dataclass decorator creating constructor and field definitions automatically
 @dataclass
 class ScriptArtifact:
+    # Line explanation: Relative or absolute file path string for the script
     filePath: str
+    
+    # Line explanation: Base filename component without folder path (e.g. "main.py")
     basename: str
+    
+    # Line explanation: Lowercased file extension string without leading dot (e.g. "py", "sh", "ts")
     extension: str
+    
+    # Line explanation: Category string holding display icon label or extension kind
     kind: str
+    
+    # Line explanation: Name of tool that produced script; valid options: "write", "edit", "bash"
     primary_tool: str
+    
+    # Line explanation: Specific extraction source kind ("write_content", "patches_only", "bash_heredoc", "bash_echo", "bash_exec", "bash_inline", "on_disk")
     source_kind: str
+    
+    # Line explanation: Unique ID string of the conversation session where script was extracted
     session_id: str
+    
+    # Line explanation: Agent name string assigned to session (e.g. "build", "explore", "coder")
     session_agent: str
+    
+    # Line explanation: Human-readable title of the AI session
     session_title: str
+    
+    # Line explanation: Boolean flag indicating if script came from a subagent child session (True) or main session (False)
     is_subagent: bool
+    
+    # Line explanation: Step status string ("completed", "error", "running", "pending")
     status: str
+    
+    # Line explanation: Creation timestamp as datetime object or None if missing
     time: Optional[_dt.datetime]
+    
+    # Line explanation: Absolute path to the source database or dump file (default "")
     db_source_path: str = ""
+    
+    # Line explanation: Full text code content of script (default "")
     content: str = ""
+    
+    # Line explanation: Total count of added lines across edits (default 0)
     additions: int = 0
+    
+    # Line explanation: Total count of deleted lines across edits (default 0)
     deletions: int = 0
+    
+    # Line explanation: List of unified diff patch strings (defaults to empty list)
     patches: List[str] = field(default_factory=list)
+    
+    # Line explanation: List of (oldText, newText) search/replace edit tuples (defaults to empty list)
     edits: List[Tuple[str, str]] = field(default_factory=list)
 
-    # Gets a visual display label with an icon corresponding to the file type extension.
+    # Property method returning visual label with emoji icon
     @property
     def label(self) -> str:
+        # Line explanation: Looks up extension in EXT_LABEL dict; if missing, returns fallback "📄 EXT" or "📄 FILE"
         return EXT_LABEL.get(self.extension, f"📄 {self.extension.upper() or 'FILE'}")
 
-    # Returns a readable text description explaining whether this code came from a main chat session or a subagent helper.
+    # Property method returning origin description string
     @property
     def origin(self) -> str:
+        # Line explanation: Checks if artifact originated from a child subagent session
         if self.is_subagent:
+            # Line explanation: Returns subagent origin string containing agent name
             return f"{self.session_agent} subagent"
+            
+        # Line explanation: Returns "main session" string for main conversation session artifacts
         return "main session"
