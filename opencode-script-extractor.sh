@@ -96,3 +96,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #   * Trace execution: `bash -x ./opencode-script-extractor.sh`
 #   * Timeout test: `timeout 5 ./opencode-script-extractor.sh` (launches and auto-kills after 5 seconds to verify startup).
 exec python3 "${SCRIPT_DIR}/gui/__main__.py" "$@"
+
+# (DevOps Note: Missing platform detection for macOS. The script assumes Linux-style path resolution
+#  (readlink -f is not available on macOS by default — use realpath or a Python fallback instead).
+#  For cross-platform support, add a platform check and use python3 -m gui as the fallback launcher.)
+# (DevOps Note: Missing error handling for Python runtime version. The script does not verify that
+#  python3 is >= 3.11 (required by the project). Add a version check before invoking python3.)
+# (DevOps Note: No systemd service unit or cron-entry template is provided for automated startup.
+#  Operators deploying this on servers should create their own .service unit file referencing this script.)
