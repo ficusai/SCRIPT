@@ -1,5 +1,14 @@
 """
 Extracts all tool call records for a session wave (main session + subagents).
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Evaluates tool calls across all extensions (.py, .ts, .js, .sh, etc.)
+- Formats Handled: JSON array of ToolCallArtifact model instances
+- Export Modes Supported: Single session tool call timeline extractor
+- Framework Possibilities:
+    - CLI: Primary tool call extraction engine for Markdown and JSON transcript exporters
+    - Observability & Telemetry: Model evaluation and tool usage tracking metrics engine
+    - Security Audit: Track terminal bash command executions and file write operations
 """
 
 from __future__ import annotations
@@ -56,6 +65,9 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #   - Output is complex object (dict or list): Formatted with `json.dumps(out_val, indent=2)`.
 #   - Error field is non-string (e.g. object): Converted via `str(err_msg)`.
 #   - Tool timestamp is missing or null: Sorted to start of list via datetime.min fallback.
+# Testing Steps:
+#   - Call `extract_tool_calls(extractor, "sess_123")`
+#   - Verify returned list is sorted by `time` ascending
 def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact]:
     # Retrieve the root session tree and create a lookup map of session details.
     tree = extractor.root_tree(root_session_id)
@@ -75,6 +87,7 @@ def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact
         status = state.get("status") or ""
         inp = state.get("input") or {}
         out_val = state.get("output")
+
         # Format complex outputs as readable JSON strings.
         if isinstance(out_val, (dict, list)):
             output_str = json.dumps(out_val, indent=2)
@@ -114,3 +127,4 @@ def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact
     # Sort tool call records chronologically by execution time.
     tool_calls.sort(key=lambda t: t.time or _dt.datetime.min)
     return tool_calls
+
