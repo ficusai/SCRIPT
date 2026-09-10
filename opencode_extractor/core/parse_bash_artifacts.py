@@ -136,10 +136,16 @@ def parse_bash_artifacts(
     if not cmd:
         return out
 
-    # (Line note: Pattern 1 - Heredoc script creation (cat > file << EOF).
-    #  HEREDOC_RE matches commands like: cat > /path/to/file.py << 'EOF'
-    #  The regex captures: group(1) = file path, group(2) = heredoc body text.
-    #  A trailing "\n" is added to cmd to ensure the regex matches heredocs that end at EOF without a final newline.
+    # (Security Note: Command Injection Risk - The `cmd` parameter comes from session logs and is
+    #  scanned with regexes but never executed by this function. However, extracted file paths from
+    #  heredoc/echo/exec patterns are used directly without sanitization when passed to read_disk_content()
+    #  or stored as artifact.filePath. A malicious actor who can inject bash tool calls could extract
+    #  paths like "../../etc/shadow" which would pass is_script_path() if the basename has a valid extension.
+    #  (CWE-78: OS Command Injection, CWE-22: Path Traversal)
+    #
+    # (Security Note: Deterministic Hashing Warning - hash() with PYTHONHASHSEED randomization means
+    #  inline script names are non-deterministic across process runs. This is a reproducibility concern,
+    #  not a security issue per se, but note that an attacker cannot predict artifact filenames.
     for m in HEREDOC_RE.finditer(cmd + "\n"):
         # (Line note: Extract and clean the file path from the heredoc match.
         #  group(1) may be None if the regex captured an empty path, so we use or "" to default to empty string.
