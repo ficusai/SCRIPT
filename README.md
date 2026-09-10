@@ -74,14 +74,14 @@ OC-SCRIPT-EXTRACTOR/
 
 ## Installation
 
-No package metadata (`pyproject.toml`, `setup.py`) is included. Install dependencies manually:
+Install dependencies using `pyproject.toml` or `pip`:
 
 ```bash
-# Core dependency
-pip install PyQt6>=6.4
+# Install directly from project root
+pip install .
 
-# Or with extras for full CLI support
-pip install PyQt6
+# Or install dependencies manually
+pip install PyQt6>=6.4.0
 ```
 
 ## Usage
