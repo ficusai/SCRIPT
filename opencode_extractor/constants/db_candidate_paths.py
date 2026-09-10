@@ -2,52 +2,46 @@
 Storage search paths for OpenCode databases.
 """
 
+# Module note: This file defines DB_CANDIDATE_PATHS, a list of filesystem paths and glob patterns used
+# by the OpenCode extractor to locate SQLite database files containing transcript and session data.
+# The list includes: (1) standard XDG-compliant paths on Linux, (2) Flatpak sandbox paths for Obsidian,
+# (3) glob patterns for imported backup databases, and (4) external drive mount patterns.
+# Paths with tilde (~) are expanded at import time using os.path.expanduser(). Paths with asterisk (*)
+# are glob patterns evaluated later by the discovery engine using glob.glob().
+
 # Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
 # Import operating system module for path expansion and filesystem utilities
 import os
 
-# Module Purpose & Overview:
-# Lists standard filesystem paths and search glob patterns where OpenCode SQLite database files are stored or backed up on the local machine.
-#
-# Variable Type & Structure:
-#   - Name: DB_CANDIDATE_PATHS
-#   - Type: List[str] (List of strings)
-#
-# Item-by-Item Path Rationale:
-#   1. ~/.local/share/opencode/opencode.db -> Primary Linux XDG user data location for OpenCode SQLite store.
-#   2. ~/.local/state/opencode/opencode.db -> Alternative XDG state directory placement used by certain builds.
-#   3. ~/.var/app/md.obsidian.Obsidian/data/opencode/opencode.db -> Flatpak sandbox directory when running inside Obsidian Flatpak.
-#   4. ~/.local/share/opencode/imported_databases/*.db -> Wildcard pattern matching manually imported backup databases.
-#   5. /run/media/*/*/.local/share/opencode/opencode.db -> External or removable drive mounts under /run/media/<user>/<volume>.
-#   6. /run/media/*/*/Unified_Backup*/*/.local/share/opencode/opencode.db -> External backup volume pattern for unified system backups.
-#
-# Path Processing Details:
-#   - Tilde expansion: os.path.expanduser converts leading '~' into the user's home directory path (e.g. '/home/user').
-#   - Wildcard matching: Entries 4, 5, and 6 contain '*' wildcards processed by glob.glob() during auto-discovery.
-#
-# How to Test:
-#   - Run: python3 -c 'from opencode_extractor.constants.db_candidate_paths import DB_CANDIDATE_PATHS; print(len(DB_CANDIDATE_PATHS))' (outputs 6)
-#   - Run: python3 -c 'from opencode_extractor.constants.db_candidate_paths import DB_CANDIDATE_PATHS; print(DB_CANDIDATE_PATHS[0])' (outputs expanded path)
-
 # Constant definition: List of string file paths and glob patterns for discovering OpenCode SQLite database files
+# Each entry is processed differently:
+#   - Entries 1-3: Absolute file paths after tilde expansion (checked for existence directly)
+#   - Entry 4: Glob pattern for wildcard database files (resolved via glob.glob at runtime)
+#   - Entries 5-6: Glob patterns for external drive mounts (resolved via glob.glob at runtime)
 DB_CANDIDATE_PATHS = [
-    # Line explanation: Primary local XDG share storage path for OpenCode database
+    # Line explanation: Primary XDG Base Directory compliant path for OpenCode user data
+    # Standard location: $HOME/.local/share/<application>/ on Linux systems per XDG spec
     os.path.expanduser("~/.local/share/opencode/opencode.db"),
-    
+
     # Line explanation: Alternative XDG state directory path for OpenCode database
+    # Some builds store state in ~/.local/state/ instead of ~/.local/share/
     os.path.expanduser("~/.local/state/opencode/opencode.db"),
-    
-    # Line explanation: Flatpak containerized storage path for Obsidian Flatpak app
+
+    # Line explanation: Flatpak containerized storage path for Obsidian's OpenCode integration
+    # Flatpak apps sandbox user data under ~/.var/app/<flatpak-id>/data/
     os.path.expanduser("~/.var/app/md.obsidian.Obsidian/data/opencode/opencode.db"),
-    
-    # Line explanation: Wildcard search pattern for imported backup database files
+
+    # Line explanation: Glob pattern for manually imported backup database files (*.db)
+    # Matches any .db file inside the imported_databases subdirectory
     os.path.expanduser("~/.local/share/opencode/imported_databases/*.db"),
-    
-    # Line explanation: Search pattern for external drives mounted under /run/media/<user>/<volume>/
+
+    # Line explanation: Glob pattern for external drives mounted under /run/media/<username>/<volume>/
+    # Matches nested path: /run/media/*/*/.local/share/opencode/opencode.db
     "/run/media/*/*/.local/share/opencode/opencode.db",
-    
-    # Line explanation: Search pattern for external backup drives named Unified_Backup*
+
+    # Line explanation: Glob pattern for unified backup volumes on external drives
+    # Matches drives named "Unified_Backup*" in their volume path
     "/run/media/*/*/Unified_Backup*/*/.local/share/opencode/opencode.db",
 ]
