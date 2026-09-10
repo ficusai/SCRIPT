@@ -1,5 +1,14 @@
 """
 Fast calculation of unique script/code file counts per root session wave.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Evaluates script artifact counts across all code extensions (.py, .ts, .js, .sh, etc.)
+- Formats Handled: Dict[str, int] mapping session UUID strings to integer script counts
+- Export Modes Supported: Session file index calculator with in-memory caching
+- Framework Possibilities:
+    - CLI: Quick session list table script file counter
+    - REST API: Expose session statistics summary in API endpoints
+    - Dashboard UI: Render script file badge counts per session item
 """
 
 from __future__ import annotations
@@ -32,18 +41,29 @@ from typing import Dict
 # Edge Cases:
 #   - Extraction fails for a specific session (e.g. invalid session ID or corrupt JSON step): Exception caught by try/except block, setting count to 0.
 #   - Codebase has 0 root sessions: Returns empty dictionary `{}` cleanly without errors.
+# Testing Steps:
+#   - Call `count_session_files(extractor)`
+#   - Verify returned value is `dict` mapping string session IDs to non-negative integer counts
 def count_session_files(extractor) -> Dict[str, int]:
     # Return the cached count results if they have already been calculated.
+    # Condition: `extractor._file_counts_cache is not None` checks if cached dictionary exists
+    # Output: Dict[str, int] cached map
     if extractor._file_counts_cache is not None:
         return extractor._file_counts_cache
 
+    # Initialize empty dictionary to hold script counts per root session ID
+    # Variable Type: Dict[str, int]
     file_counts: Dict[str, int] = {}
-    # Fetch all top-level root sessions.
+
+    # Fetch all top-level root sessions from database sources
+    # Variable Type: List[SessionInfo]
     roots = extractor.root_sessions()
 
     # Loop through each root session to extract and count its scripts.
     for r in roots:
         try:
+            # Extract script list for current root session ID
+            # Variable Type: List[ScriptArtifact]
             scripts = extractor.extract_scripts(r.id)
             file_counts[r.id] = len(scripts)
         except Exception:
@@ -51,5 +71,10 @@ def count_session_files(extractor) -> Dict[str, int]:
             file_counts[r.id] = 0
 
     # Store the dictionary in the extractor's cache for future calls.
+    # Cache Field: extractor._file_counts_cache
     extractor._file_counts_cache = file_counts
+
+    # Return completed file counts dictionary
+    # Output: Dict[str, int]
     return file_counts
+
