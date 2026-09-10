@@ -271,10 +271,22 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
                 #  edit artifact that lacks a prior write. For sessions editing many files, this results in N
                 #  sequential disk I/O operations. Consider batching disk reads or caching read results per-path
                 #  within the function scope to avoid re-reading the same file if referenced by multiple edits.)
-                on_disk = read_disk_content(art.filePath)
-                if on_disk is not None:
-                    art.content = on_disk
-                    art.source_kind = "on_disk"
+                #
+                # (Security Fix: Confine file reads to session workspace directory to prevent arbitrary local file
+                #  disclosure via untrusted database dumps. A malicious dump could specify filePath pointing to
+                #  sensitive host files like ~/.ssh/id_rsa or /etc/passwd.)
+                ws_dir = member_map.get(art.session_id).directory if member_map.get(art.session_id) else ""
+                safe_path = None
+                if ws_dir and os.path.isabs(ws_dir):
+                    ws_resolved = os.path.realpath(ws_dir)
+                    candidate = os.path.realpath(os.path.join(ws_resolved, art.filePath))
+                    if candidate == ws_resolved or candidate.startswith(ws_resolved + os.sep):
+                        safe_path = candidate
+                if safe_path:
+                    on_disk = read_disk_content(safe_path)
+                    if on_disk is not None:
+                        art.content = on_disk
+                        art.source_kind = "on_disk"
         final.append(art)
 
     # Sort final list by file path in lower case for consistency.
