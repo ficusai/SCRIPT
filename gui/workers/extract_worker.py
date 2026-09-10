@@ -1,3 +1,8 @@
+# Module note: Single Session Script Extraction QThread Worker.
+# Purpose: Fetches code script files and edit patch diffs for a selected session ID on a background QThread.
+# Plain-language overexplanation for beginners:
+# When a user clicks a session row in the GUI table, this worker thread extracts all script artifacts and code patch diffs for that specific session in the background so the user interface never freezes.
+
 from typing import Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 from opencode_extractor import OpenCodeExtractor
