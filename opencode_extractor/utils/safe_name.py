@@ -41,9 +41,15 @@ import re
 
 # Function declaration: Takes input string and returns sanitized string safe for file names
 def safe_name(name: str) -> str:
-    # Line explanation: Uses regular expression substitution to replace every occurrence of any forbidden character (slashes, colons, quotes, control chars) with an underscore '_'.
-    # Options & Replacement: All forbidden chars [/\\:*?\"<>|\x00-\x1f] become '_'. Unmatched characters (letters, numbers, spaces, dots, underscores) are left unchanged.
-    # Output: Replaced string assigned back to local variable 'name'.
+    # (Security Note: Path Traversal Mitigation - This function replaces forbidden filename characters
+    #  but does NOT strip ".." components. A path like "../../etc/shadow" becomes "_._._etc_shadow"
+    #  after this function, which is safer but still worth noting.
+    #  Callers should additionally check for ".." in path components before joining into a directory tree.
+    #  (CWE-22: Improper Limitation of a Pathname to a Restricted Directory)
+    #
+    # (Security Note: Null Byte Injection - The regex already removes \x00-\x1f including null bytes,
+    #  which prevents null byte injection attacks (CWE-626) on Python < 3.9 where null bytes in paths
+    #  could truncate filenames. This is safe for Python 3.9+.
     name = re.sub(r"[/\\:*?\"<>|\x00-\x1f]", "_", name)
     
     # Line explanation: Strips leading and trailing space and dot characters (.strip(" .")), and if the resulting string is empty, returns the default fallback string "file".
