@@ -72,7 +72,9 @@ def connect_sqlite(conns: Dict[str, sqlite3.Connection], path: str) -> sqlite3.C
         #  locale encodings (e.g. some legacy Linux setups with LANG=C), paths containing non-ASCII
         #  characters may produce invalid URIs. Python 3.11+ uses UTF-8 as the default filesystem
         #  encoding on all platforms (PEP 597), so this is safe on supported Python versions.)
-        uri = "file:" + path.replace("?", "%3f").replace("#", "%23") + "?mode=ro"
+        # Use pathlib.Path.as_uri() for cross-platform URI construction (handles Windows backslashes).
+        from pathlib import Path
+        uri = str(Path(path).as_uri()) + "?mode=ro"
 
         # Open the connection using SQLite's URI mode.
         # Function Call: sqlite3.connect(uri, uri=True)

@@ -218,7 +218,10 @@ def discover_all_databases() -> List[DatabaseSource]:
                     # (Line note: Parse the drive name from paths like "/run/media/ficus-pro/USB_DRIVE/...".
                     #  Split on "/run/media/ficus-pro/" and take the first path component as the drive name.
                     #  If the split fails (unexpected path format), fall back to "External".
-                    drive_name = p.split("/run/media/ficus-pro/")[1].split("/")[0] if "/run/media/ficus-pro/" in p else "External"
+                    # Parse drive name from paths like "/run/media/<username>/<drive>/..."
+                    # Dynamically detect username to work across different systems
+                    parts = p.split("/run/media/")[-1].split("/") if "/run/media/" in p else []
+                    drive_name = parts[1] if len(parts) > 1 else parts[0] if parts else "External"
                     label = f"External Drive DB ({drive_name}) ({size_mb:.1f} MB)"
                 else:
                     # (Line note: General fallback label for any database not matching the above patterns.
