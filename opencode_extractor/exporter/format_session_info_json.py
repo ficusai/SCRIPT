@@ -125,6 +125,13 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #    - Test with a bundle that has no subagents: subagents should be [], subagent_count should be 0
 #    - Test with a bundle that has None time_created: created field should be null in JSON
 # )
+# (Data Architecture Note: SessionInfo JSON export schema. This is the machine-readable metadata contract.
+#  time_updated is deliberately omitted — only time_created is serialized as "created".
+#  Subagent title uses raw .title (not .display_title), creating an inconsistency with the root session.
+#  The subagents list omits parent_id and subagent_count, meaning downstream consumers cannot reconstruct
+#  the relationship graph from this JSON alone without joining against other sources.
+#  The output is always valid JSON; never raises on normal inputs. All datetime objects are converted
+#  to ISO 8601 strings; None values serialize as JSON null.)
 def format_session_info_json(
     # (Parameter note: SessionExportBundle containing the session metadata, subagents, scripts, and tool calls
     #  to be serialized into JSON format.

@@ -164,6 +164,14 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #    - Test with a bundle that has 0 tool calls: should contain the "No tool calls" notice
 #    - Test with an output > 5000 chars: should be truncated with the truncation message
 # )
+# (Data Architecture Note: Tool calls Markdown transcript schema. Human-readable format for end users.
+#  Unlike the JSON formatter, this formatter applies a 5000-character truncation to tool output fields
+#  (marked with "\n... (output truncated)"), while the JSON formatter has no such limit.
+#  Input parameters are serialized with json.dumps(indent=2) in ```json fenced code blocks; if that
+#  fails (non-serializable types from SQLite), str(tc.input_params) is used as fallback.
+#  tool_name, status, and titles are interpolated WITHOUT markdown escaping — exotic backticks or pipes
+#  can break rendering. The document has NO trailing newline at end. Empty tool_calls produces a notice
+#  "*No tool calls recorded in this session wave.*" rather than an empty document body.)
 def format_tool_calls_markdown(
     # (Parameter note: SessionExportBundle containing the session metadata and tool call records
     #  to be formatted as a Markdown transcript.

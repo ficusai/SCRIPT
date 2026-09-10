@@ -105,10 +105,15 @@ from typing import Optional
 #   - output and error fields may contain binary data if SQLite stores TEXT with invalid UTF-8
 #   - time field is datetime from parse_ts(); may be None if column is NULL or 0
 #   - is_subagent boolean is set during load; never modified after creation
-# (Data Note: Tool call artifact recording. The input_params dict preserves original types from SQLite,
-#  which may include nested dicts, lists, strings, numbers, and booleans. JSON serialization of this
-#  field may fail if custom objects are present. The output field is raw text; very large outputs
-#  (>1MB) are not truncated and may cause memory pressure during export.)
+# (Data Architecture Note: ToolCallArtifact records represent individual tool invocations within a session.
+#  The input_params dict is a denormalized snapshot of the tool's input state — it preserves original Python
+#  types from SQLite (which may include nested dicts, lists, and non-JSON-serializable objects like Path instances).
+#  The output field stores the serialized result as a string; complex objects are json.dumps(indent=2)'d at
+#  extraction time in extract_tool_calls.py. There is NO size limit on output — very large outputs (>1MB)
+#  will be stored in memory and written to export files without truncation.
+#  Call_id uniqueness is NOT enforced across database sources; deduplication happens in the extraction layer,
+#  not at the model level. The status field accepts any string — expected values are "completed", "error",
+#  "running", "pending" but invalid values pass through without validation.)
 #
 # How to Test:
 #   - Run: python3 -c 'from opencode_extractor.models.tool_call_artifact import ToolCallArtifact; t = ToolCallArtifact("c1", "bash", "s1", "build", "Title", False, "completed", None); print(t.tool_name, t.input_params)' (outputs bash {})

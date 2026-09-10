@@ -12,16 +12,23 @@ from dataclasses import dataclass
 # Class Purpose & Overview:
 # Data class container holding information about an OpenCode database or transcript dump file discovered on disk.
 #
-# Field Specification & Types:
-#   - label: str (Required) Human-readable display banner (e.g. "Primary Local SSD Database (5.2 MB)", "Text Dump: opencode_parts.txt").
-#   - path: str (Required) Absolute filesystem path to the database or text dump file.
-#   - size_mb: float (Required) File size measured in Megabytes (MB).
-#   - kind: str (Optional, default="sqlite") Source type category: "sqlite" for SQLite DBs or "text_dump" for pipe-delimited text transcript files.
-#   - session_count: int (Optional, default=0) Total count of conversation sessions stored in this database source.
+# FIELD SCHEMA:
+#   label:          str    Human-readable display banner (e.g. "Primary Local SSD Database (5.2 MB)")
+#   path:           str    Absolute filesystem path to the database or text dump file
+#   size_mb:        float  File size measured in Megabytes (MB)
+#   kind:           str    Source type category: "sqlite" | "text_dump" (default: "sqlite")
+#   session_count:  int    Total count of conversation sessions (computed post-discovery, default: 0)
 #
-# Edge Cases & Defaults:
-#   - Synthetic instances: Un-discovered --db paths default size_mb to 0.0 and kind to "sqlite".
-#   - Unreadable databases: session_count defaults to 0 if counting sessions fails due to database errors.
+# Data Architecture Notes:
+#   - kind="sqlite" is the implicit default; passing a text dump with kind="sqlite" causes silent SQL failures
+#     because connect_sqlite() will attempt to open the .txt file as a SQLite database.
+#   - session_count is NOT authoritative — it is a best-effort estimate computed by COUNT(*) queries that
+#     may fail silently and leave the count at 0.
+#   - DatabaseSource instances are immutable once created; there is no mutation path.
+# (Data Architecture Note: DatabaseSource is a lightweight descriptor used to route between SQLite and text-dump
+#  loading paths. It does NOT contain connection state or query results. The kind field acts as a discriminator
+#  but has no enforced enum — invalid values are silently ignored by load_sessions() and fetch_part_rows().
+#  The path field is the primary key for connection pooling in connect_sqlite().)
 #
 # How to Test:
 #   - Run: python3 -c 'from opencode_extractor.models.database_source import DatabaseSource; db = DatabaseSource(label="Local", path="/a.db", size_mb=1.5); print(db.kind, db.session_count)' (outputs "sqlite 0")

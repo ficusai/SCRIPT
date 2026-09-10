@@ -73,17 +73,15 @@ from typing import Optional
 # Class Purpose & Overview:
 # Data container holding metadata about an individual AI conversation session (such as session ID, title, agent name, LLM model name, working directory, and timestamps).
 #
-# Field Specification & Types:
-#   - id: str (Required) Unique session identifier string (e.g. "sess_98765fedcba").
-#   - title: str (Required) Title text of session.
-#   - agent: str (Required) Agent name string (e.g. "build", "explore", "coder").
-#   - model: str (Required) LLM model string (e.g. "claude-3-5-sonnet", "gpt-4o").
-#   - directory: str (Required) Project working directory path.
-#   - parent_id: Optional[str] (Required) Parent session ID string if subagent child, or None if root session.
-#   - time_created: Optional[datetime] (Required) Session creation timestamp object or None.
-#   - time_updated: Optional[datetime] (Required) Session last update timestamp object or None.
-#   - db_source_path: str (Optional, default="") Absolute path to database file containing this session.
-#   - subagent_count: int (Optional, default=0) Number of child subagent sessions created by this session.
+# FIELD SCHEMA (SQLite session table mapping):
+#   id              TEXT    PK, NOT NULL  Unique session identifier (e.g. "sess_98765fedcba"). No format validation.
+#   title           TEXT    NOT NULL      Human-readable session title. DB NULL -> "".
+#   agent           TEXT    NOT NULL      Agent persona ("build", "explore", "coder"). DB NULL -> "".
+#   model           TEXT    NOT NULL      LLM model name. DB NULL -> "".
+#   directory       TEXT    NOT NULL      Project working directory path. DB NULL -> "".
+#   parent_id       TEXT    NULLABLE      Parent session ID if subagent. NULL or "" -> None (root session).
+#   time_created    REAL    NULLABLE      Creation timestamp (seconds-since-epoch). NULL or 0 -> None.
+#   time_updated    REAL    NULLABLE      Last update timestamp. NULL or 0 -> None.
 #
 # Data Constraints & Edge Cases:
 #   - Session IDs are strings with no format validation; they may contain any characters including pipes "|"
@@ -94,9 +92,11 @@ from typing import Optional
 #   - db_source_path may be empty string "" for text dump sources before source path is known
 #   - No uniqueness guarantee on id field; first occurrence wins during multi-source loading
 #   - Field naming is inconsistent: some fields use snake_case (time_created) while others use camelCase elsewhere
-# (Data Note: Session metadata container. All string fields accept arbitrary input; no URI/path validation.
-#  Timestamp coercion: SQLite NULL -> None, SQLite 0 -> None, SQLite REAL/INT -> datetime via parse_ts().
-#  The is_subagent property derives from parent_id truthiness; empty string "" is treated as root session.)
+# (Data Architecture Note: SessionInfo is the foundational model for the session relationship graph.
+#  The parent_id field creates a directed acyclic graph (DAG) where root sessions have parent_id=None.
+#  Circular references (A->B->A) are NOT detected here; they are handled by find_descendants() via a seen-set.
+#  The subagent_count field is a computed denormalization — it is NOT stored in the database and must be
+#  recalculated after every load. First-wins deduplication means this count is source-order dependent.)
 #
 # Properties:
 #   - is_subagent -> bool: Returns True if parent_id is set (indicating a child subagent session), or False if root.
