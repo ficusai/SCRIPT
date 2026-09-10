@@ -1,5 +1,14 @@
 """
 Formats session transcript and tool call logs as Markdown.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .md (Markdown transcript document output format)
+- Formats Handled: CommonMark / GitHub Flavored Markdown document text
+- Export Modes Supported: Human-readable session transcript formatter
+- Framework Possibilities:
+    - CLI: Generates tool_calls_transcript.md file during export
+    - Documentation Generators: Render session execution logs in developer portals or Obsidian vaults
+    - Web UI: Render rich markdown transcript previews in web interface
 """
 
 from __future__ import annotations
@@ -37,10 +46,20 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   - Tool output exceeding 5000 characters: Truncated cleanly with message `"\n... (output truncated)"`.
 #   - Bundle with 0 tool calls: Includes notice `"*No tool calls recorded in this session wave.*"`.
 #   - Non-serializable input_params: Exception caught, falls back to str(tc.input_params).
+# Testing Steps:
+#   - Pass `bundle` to `format_tool_calls_markdown(bundle)`
+#   - Verify returned string starts with `# Session Transcript & Tool Call Log`
 def format_tool_calls_markdown(bundle: SessionExportBundle) -> str:
+    # Extract session info instance from export bundle
+    # Variable Type: SessionInfo
     s = bundle.session
+
+    # Initialize empty list to accumulate Markdown lines
+    # Variable Type: List[str]
     md = []
+
     # Build header and session details section.
+    # Markdown Elements: Heading level 1 `#`, unordered bullet lists `- **Key:** Value`
     md.append("# Session Transcript & Tool Call Log")
     md.append(f"- **Title:** {s.display_title}")
     md.append(f"- **Session ID:** `{s.id}`")
@@ -53,11 +72,13 @@ def format_tool_calls_markdown(bundle: SessionExportBundle) -> str:
     md.append(f"- **Extracted Script Files:** {len(bundle.scripts)}")
     md.append("\n---\n")
 
+    # Add section header for tool execution log
     md.append("## Tool Calls Log\n")
     if not bundle.tool_calls:
         md.append("*No tool calls recorded in this session wave.*\n")
     else:
         # Loop through each tool call record to output Markdown formatting.
+        # Enumerate 1-indexed count for entry numbering
         for idx, tc in enumerate(bundle.tool_calls, 1):
             ts_str = tc.time.strftime("%Y-%m-%d %H:%M:%S") if tc.time else "N/A"
             origin = f"{tc.session_agent} subagent" if tc.is_subagent else "main session"
@@ -66,6 +87,7 @@ def format_tool_calls_markdown(bundle: SessionExportBundle) -> str:
                 md.append(f"*Call ID:* `{tc.call_id}`")
 
             # Add input parameters section formatted as JSON code block.
+            # Code fence: ```json
             md.append("\n**Input Parameters:**")
             md.append("```json")
             try:
@@ -75,6 +97,7 @@ def format_tool_calls_markdown(bundle: SessionExportBundle) -> str:
             md.append("```")
 
             # Add output section if available (truncating long output previews).
+            # Max Output Preview Length: 5000 characters
             if tc.output:
                 out_preview = tc.output.strip()
                 if len(out_preview) > 5000:
@@ -90,4 +113,7 @@ def format_tool_calls_markdown(bundle: SessionExportBundle) -> str:
 
             md.append("\n---\n")
 
+    # Join lines with newlines and return complete Markdown document string
+    # Output: str Markdown text document
     return "\n".join(md)
+
