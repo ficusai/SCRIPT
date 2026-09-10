@@ -4,6 +4,19 @@ This guide explains how Git works in this project (`OC-SCRIPT-EXTRACTOR`), how t
 
 ---
 
+## Repository File Manifest
+
+This repository strictly tracks files belonging to `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`:
+- `AGENTS.md` (Agent execution rules & mandatory local commit policy)
+- `GIT_GUIDE.md` (Git reference, restoration commands, and workflow guide)
+- `.gitignore` (Ignore rules for cache, pycache, build artifacts)
+- `gui/` (PySide6 Graphical User Interface components, handlers, workers, styles)
+- `opencode_extractor/` (Core python package for session/script extraction & parsing)
+- `opencode-script-extractor.desktop` (Linux desktop application launcher entry)
+- `opencode-script-extractor.sh` (Shell execution launcher)
+
+---
+
 ## 1. Basic Git Commands
 
 ### Check Repository Status
