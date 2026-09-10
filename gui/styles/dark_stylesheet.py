@@ -1,3 +1,9 @@
+# Module note: Dark Theme Stylesheet Module.
+# Purpose: Defines the dark color theme stylesheet string (Catppuccin Mocha-inspired palette) used across all window components.
+# Plain-language overexplanation for beginners:
+# This file contains all the CSS styling rules that give the desktop app its dark theme appearance.
+# It sets background colors, font sizes, button rounded corners, hover highlight effects, and checkbox styling.
+
 # Dark Theme Stylesheet Module.
 # Purpose: Defines the dark color theme stylesheet string (Catppuccin Mocha-inspired palette) used across all window components.
 # Layout Context: Sets global color values and typography across all visual widgets in MainWindow (1200x780 pixels).
