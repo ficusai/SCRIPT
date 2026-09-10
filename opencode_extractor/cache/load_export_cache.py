@@ -1,0 +1,75 @@
+"""
+Loads raw export cache dictionary from disk.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Dict
+
+from opencode_extractor.cache.ensure_cache_dir import CACHE_FILE, ensure_cache_dir
+
+
+# Reads the cache file from disk and returns its dictionary data so the program knows which sessions were saved earlier.
+# Returns a dictionary containing details about previously exported sessions, or an empty dictionary if no file exists.
+# File Formatting & Expected Cache JSON Schema:
+#   - JSON format: Indented UTF-8 encoded text file located at CACHE_FILE.
+#   - Schema layout:
+#       {
+#         "version": 1,
+#         "last_updated": "2026-09-10T15:30:00.000000",
+#         "exported_sessions": {
+#           "sess_123": {
+#             "exported_at": "2026-09-10T15:30:00.000000",
+#             "output_path": "/tmp/exports/sess_123",
+#             "script_count": 3,
+#             "tool_call_count": 8
+#           }
+#         }
+#       }
+#   - Field-by-field meaning:
+#       * "version": Cache format version (integer, currently always 1). WRITTEN by the save functions but never
+#         read or validated here; reserved for future schema migration.
+#       * "last_updated": ISO 8601 string of the most recent write. Written for humans/debugging; ignored by readers.
+#       * "exported_sessions": The meaningful payload — a map of exported session ID -> metadata dict. Metadata keys:
+#           "exported_at"    (ISO 8601 string),
+#           "output_path"    (string; where the export data went),
+#           "script_count"   (int; how many scripts were written),
+#           "tool_call_count"(int; how many tool calls were recorded).
+#   - Return semantics: This function returns ONLY the "exported_sessions" value. "version" and "last_updated"
+#     are dropped, so callers cannot see them through this function.
+# Function Signature Details:
+#   - Parameters: none.
+#   - Return type: Dict[str, Dict[str, Any]] — a map of session ID -> session metadata, or {} when nothing is usable.
+# Failure & Recovery Behavior (always degrades to {} instead of raising):
+#   - File absent: ensure_cache_dir() first creates the folder (that call itself MAY raise if the folder is
+#     unwritable), then the missing-file check returns {}.
+#   - Corrupted JSON (e.g. invalid syntax `{bad json`): json.loads raises, caught -> returns `{}`.
+#   - Root JSON is not a dict (e.g. `[1, 2, 3]`, `"string"`, `42`): isinstance fails -> returns `{}`.
+#   - Root dict without the "exported_sessions" key (e.g. `{"version": 1}`): key check fails -> returns `{}`.
+#   - "exported_sessions" holds a NON-dict value (list/None/string): returned as-is with no type check, so
+#     downstream set()/membership calls could misbehave (defensive callers should not reach this state).
+#   - Read permission errors (EACCES) or any other exception while reading/parsing: broad catch -> returns `{}`.
+# Concurrency & Race Conditions:
+#   - No file lock is used. Writers perform a read-modify-write of the whole payload, so concurrent processes
+#     can lose each other's updates (last writer wins). Atomic replace in the single-session writer only prevents
+#     a torn file, not lost updates.
+# Testing Values & Edge Cases:
+#   - Valid return: Dict[str, Dict[str, Any]] mapping session_id to metadata dict.
+#   - Corrupted JSON text, non-dict root, missing key, permission errors: all return `{}` without crashing.
+def load_export_cache() -> Dict[str, Dict[str, Any]]:
+    # Make sure the cache directory is present on disk.
+    ensure_cache_dir()
+    # If the cache file does not exist yet, return an empty dictionary.
+    if not CACHE_FILE.exists():
+        return {}
+    try:
+        # Read the contents of the cache JSON file and convert it into a Python dictionary.
+        data = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+        # Verify that the parsed data is a dictionary containing the 'exported_sessions' key.
+        if isinstance(data, dict) and "exported_sessions" in data:
+            return data["exported_sessions"]
+    except Exception:
+        # If reading or parsing fails for any reason, safely ignore errors and return an empty dictionary.
+        pass
+    return {}
