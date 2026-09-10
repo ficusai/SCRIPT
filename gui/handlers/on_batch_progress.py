@@ -1,3 +1,8 @@
+# Module note: Batch Export Progress Handler Callback.
+# Purpose: Updates progress bar value and status message text during batch export.
+# Plain-language overexplanation for beginners:
+# As each session is processed during an export job, this callback updates the progress bar fill level and status text so the user can see real-time progress.
+
 # Callback handler invoked periodically during batch export execution on the background thread.
 # Triggered via BatchExportWorker.progress_signal emission across thread boundary.
 #
