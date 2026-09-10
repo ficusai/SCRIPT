@@ -214,10 +214,15 @@ def discover_all_databases() -> List[DatabaseSource]:
                     fn = os.path.basename(p)
                     label = f"Imported Backup DB: {fn} ({size_mb:.1f} MB)"
                 elif "/run/media/" in p or "/media/" in p or "/mnt/" in p:
-                    # Parse drive name dynamically from mount paths like "/run/media/<user>/<drive>/..." or "/media/<user>/<drive>/..."
+                    # Parse drive name dynamically from mount paths like "/run/media/<user>/<drive>/..." or "/media/<drive>/..."
                     prefix = "/run/media/" if "/run/media/" in p else ("/media/" if "/media/" in p else "/mnt/")
-                    parts = p.split(prefix)[-1].split("/") if prefix in p else []
-                    drive_name = parts[1] if len(parts) > 1 else (parts[0] if parts else "External")
+                    parts = [pt for pt in p.split(prefix)[-1].split("/") if pt]
+                    # If parts[1] exists and is not a hidden directory like '.local', it's the drive name; otherwise parts[0]
+                    drive_name = "External"
+                    if len(parts) > 1 and not parts[1].startswith("."):
+                        drive_name = parts[1]
+                    elif parts and not parts[0].startswith("."):
+                        drive_name = parts[0]
                     label = f"External Drive DB ({drive_name}) ({size_mb:.1f} MB)"
                 else:
                     # (Line note: General fallback label for any database not matching the above patterns.

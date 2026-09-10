@@ -43,4 +43,4 @@ fi
 # Create user bin symlink for CLI invocation
 ln -sf "${REPO_DIR}/opencode-script-extractor.sh" "${BIN_DIR}/opencode-script-extractor"
 
-echo "OpenCode Script Extractor successfully installed to $DESKTOP_TARGET"
+echo "SCRIPT by FICUS (ficusai) successfully installed to $DESKTOP_TARGET"
