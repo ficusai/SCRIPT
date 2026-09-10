@@ -1,3 +1,9 @@
+# Module note: Script Preview Panel Component Builder.
+# Purpose: Constructs and returns the right panel displaying the extracted scripts list and code content preview window.
+# Plain-language overexplanation for beginners:
+# This file builds the right side of the main application window.
+# The top part lists all code script files extracted from a session, and the bottom part shows a read-only code editor where users can read the source code.
+
 # Line note: Import UI widgets (group boxes, layout containers, splitters, labels, buttons, list boxes, text boxes) from PyQt6.
 from PyQt6.QtWidgets import QGroupBox, QVBoxLayout, QSplitter, QWidget, QHBoxLayout, QLabel, QPushButton, QListWidget, QTextEdit
 # Line note: Import Qt constants for vertical/horizontal splitting orientations.
