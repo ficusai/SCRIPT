@@ -1,5 +1,24 @@
 """
 Exports multiple session bundles containing scripts, tool calls, and transcripts.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported:
+    - Target Output Files: .json, .md, .patch, .zip, and all extracted code file extensions (.py, .ts, .js, .sh, etc.)
+- Formats Handled:
+    - Markdown (.md) for session summaries (SUMMARY.md) and tool transcripts (tool_calls_transcript.md)
+    - JSON (.json) for metadata (session_info.json) and tool logs (tool_calls.json)
+    - Unified Diff (.patch) for script modification diffs
+    - ZIP (.zip) with ZIP_DEFLATED compression algorithm for compressed exports
+- Export Modes Supported:
+    - Full Export: Both scripts and tool calls
+    - Scripts Only: `export_scripts_flag=True, export_tool_calls=False`
+    - Tool Calls Only: `export_scripts_flag=False, export_tool_calls=True`
+    - Archive Mode: `create_zip=True` creates compressed zip archive
+    - Directory Mode: `create_zip=False` creates nested filesystem directory tree
+- Framework Possibilities:
+    - CLI: Primary export pipeline target for `export-all` and `export-bundle` commands
+    - Web API: Background export job generator producing downloadable ZIP files or folder structures
+    - Data Pipelines: Bulk ingestion pre-processor for session analytics and training dataset preparation
 """
 
 from __future__ import annotations
@@ -82,6 +101,9 @@ from opencode_extractor.utils.safe_name import safe_name
 #   - Relative (non-absolute) script paths: leading "/" stripped; remaining path structure preserved as-is.
 #   - Invalid or empty file paths: Sanitized via `safe_name`, fallback to `script_i.txt` if empty.
 #   - Common directory prefix calculation failure: Fallback to lstrip("/") relative paths cleanly.
+# Testing Steps:
+#   - Call `export_session_bundles(bundles=[bundle], dest_dir="/tmp/export_test", create_zip=False)`
+#   - Verify folder exists and contains `session_info.json`, `tool_calls.json`, `tool_calls_transcript.md`
 def export_session_bundles(
     bundles: List[SessionExportBundle],
     dest_dir: str,
@@ -94,11 +116,24 @@ def export_session_bundles(
     folder_name: Optional[str] = None,
     on_progress=None,
 ) -> Tuple[int, int, str]:
+    # Construct Path object for target destination folder
+    # Variable Type: pathlib.Path
     dest = Path(dest_dir)
+
+    # Create destination directory structure if missing
+    # Parameters: parents=True (create parent dirs), exist_ok=True (no error if exists)
     dest.mkdir(parents=True, exist_ok=True)
+
+    # Format current date and time string for unique export folder naming
+    # Variable Type: str (format "YYYYMMDD_HHMMSS")
     ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Generate a descriptive folder name if none was supplied.
+    # Logic:
+    #   - If folder_name is specified: keep as-is
+    #   - If len(bundles) > 1: "opencode_export_all_sessions_20260910_120000"
+    #   - If len(bundles) == 1: "opencode_export_<clean_title>_20260910_120000"
+    #   - If len(bundles) == 0: "opencode_export_20260910_120000"
     if not folder_name:
         if len(bundles) > 1:
             folder_name = f"opencode_export_all_sessions_{ts}"
@@ -108,6 +143,8 @@ def export_session_bundles(
         else:
             folder_name = f"opencode_export_{ts}"
 
+    # Initialize variables for optional ZIP file output
+    # Variable Types: Optional[pathlib.Path], Optional[zipfile.ZipFile]
     zip_path = None
     zf: Optional[zipfile.ZipFile] = None
 
@@ -115,29 +152,39 @@ def export_session_bundles(
     if create_zip:
         zip_file_name = f"{folder_name}.zip"
         zip_path = dest / zip_file_name
+        # Open ZipFile in write mode ("w") with DEFLATE compression
         zf = zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED)
         export_target_dir = dest
     else:
+        # Create output target directory path on filesystem
         if create_subfolder or folder_name:
             export_target_dir = dest / folder_name
         else:
             export_target_dir = dest
         export_target_dir.mkdir(parents=True, exist_ok=True)
 
+    # Counters for scripts and tool calls written during export
+    # Variable Type: int
     scripts_written = 0
     tool_calls_written = 0
 
     # Inner helper function to write content either into the ZIP file or directly onto the filesystem.
+    # Parameters:
+    #   rel_path (str): Relative file path within export container (e.g. "01_session/session_info.json")
+    #   content (str): File body text content
     def emit(rel_path: str, content: str):
         if zf is not None:
+            # Format archive relative path inside ZIP
             archive_path = f"{folder_name}/{rel_path}" if folder_name else rel_path
             zf.writestr(archive_path, content)
         else:
+            # Write file directly to local filesystem
             target = export_target_dir / rel_path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8", errors="replace")
 
     # Generate a master SUMMARY.md overview document if exporting multiple sessions.
+    # Condition: `len(bundles) > 1` triggers creation of master markdown index summary
     if len(bundles) > 1:
         summary_md = ["# OpenCode Session Export Summary", f"**Export Date:** {_dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", f"**Total Sessions:** {len(bundles)}", "\n---\n", "| Index | Date | Agent | Subs | Tool Calls | Scripts | Title |", "|-------|------|-------|------|------------|---------|-------|"]
         for i, b in enumerate(bundles, 1):
@@ -147,14 +194,17 @@ def export_session_bundles(
 
     # Export each individual session bundle.
     for idx, bundle in enumerate(bundles, 1):
+        # Fire progress callback if provided by caller
         if on_progress:
             on_progress(idx, len(bundles), bundle.session.display_title)
 
+        # Build clean timestamp and title strings for session subfolder naming
         dt_prefix = bundle.session.time_created.strftime("%Y%m%d_%H%M%S") if bundle.session.time_created else "nodate"
         clean_title = safe_name(bundle.session.display_title)
         sid_short = bundle.session.id[:8]
 
         # Use separate subfolders for each session when processing multiple sessions.
+        # Subfolder Naming Format: "01_20260910_120000_Fix_Bug_sess1234"
         if len(bundles) > 1:
             sess_dir = f"{idx:02d}_{dt_prefix}_{clean_title}_{sid_short}"
         else:
@@ -167,8 +217,10 @@ def export_session_bundles(
             return path_part
 
         # 1. Export Metadata & Tool Calls
+        # Write formatted session metadata JSON file
         emit(sess_rel("session_info.json"), format_session_info_json(bundle))
 
+        # Write tool call logs in both JSON and Markdown formats if enabled
         if export_tool_calls:
             emit(sess_rel("tool_calls.json"), format_tool_calls_json(bundle))
             emit(sess_rel("tool_calls_transcript.md"), format_tool_calls_markdown(bundle))
@@ -176,6 +228,7 @@ def export_session_bundles(
 
         # 2. Export Script Files
         if export_scripts_flag and bundle.scripts:
+            # Determine subfolder for script storage ("scripts" or session root)
             script_subfolder = sess_rel("scripts") if (sess_dir or export_tool_calls) else sess_rel("")
 
             # Calculate common directory prefix to trim redundant parent folders.
@@ -209,6 +262,7 @@ def export_session_bundles(
                 else:
                     rel = safe_name(posixpath.basename(raw))
 
+                # Fallback naming if relative path is empty or invalid
                 if not rel or rel == "file":
                     rel = f"script_{i}.txt"
 
@@ -216,13 +270,14 @@ def export_session_bundles(
                 emit(script_target_rel, art.content or "")
                 scripts_written += 1
 
-                # Optionally write diff patches.
+                # Optionally write diff patches if available on script artifact
                 if write_patches and art.patches:
                     patch_rel = f"{script_target_rel}.patch"
                     patch_text = "\n\n".join(art.patches)
                     emit(patch_rel, patch_text)
 
         # Mark session as exported in persistent cache.
+        # Saves session_id, output_path, script_count, tool_call_count to cache JSON file
         mark_session_exported(
             session_id=bundle.session.id,
             output_path=str(export_target_dir / sess_dir) if sess_dir else str(export_target_dir),
@@ -231,8 +286,10 @@ def export_session_bundles(
         )
 
     # Close ZIP file archive if active.
+    # Output: Tuple[int, int, str] -> (scripts_written, tool_calls_written, output_file_or_directory_path)
     if zf is not None:
         zf.close()
         return scripts_written, tool_calls_written, str(zip_path)
 
     return scripts_written, tool_calls_written, str(export_target_dir)
+
