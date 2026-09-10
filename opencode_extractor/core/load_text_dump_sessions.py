@@ -1,5 +1,13 @@
 """
 Parses sessions from text dump files like opencode_parts.txt.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Plain text files (.txt) with pipe-delimited session data
+- Formats Handled: One JSON payload per line, pipe-separated into session_id|message_id|payload
+- Export Modes Supported: Text dump ingestion alongside SQLite database sources
+- Framework Possibilities:
+    - CLI: Secondary ingestion path for OpenCode session exports exported as plain text
+    - Data Pipelines: Ingests batch-exported session logs for archival or migration
 """
 
 from __future__ import annotations
@@ -11,83 +19,134 @@ from typing import Dict, List, Tuple
 from opencode_extractor.models.session_info import SessionInfo
 
 
-# Reads pipe-delimited text dump files line by line to extract session information and step payloads.
-# File Format Parsing & Title Inference Logic:
-#   - Format: `<session_id>|<message_id>|<json_payload>` per line.
-#   - Splitting: Uses `line.split("|", 2)` to isolate session ID, message ID, and raw JSON payload text.
-#     A line needs at least 3 pipe-separated parts; 1- or 2-part lines are skipped.
-#   - The session_id string is kept VERBATIM (including spaces) as the dict key.
-#   - Title Inference: Scans step payloads for tool type `type="tool"` and tool name `tool="task"`.
-#     If present, extracts `state.input.description` as session title. Fallback title format: `Dump Session (<sid[:10]>)`.
-#     Inference only runs the FIRST time a session ID is seen (sid not in sessions); later rows for the same ID
-#     append parts but never rewrite the title.
-# Function Signature & Parameter Details:
-#   path (str): File path of the text dump (e.g. "/tmp/opencode_parts.txt").
-#   sessions (Dict[str, SessionInfo]): shared map being filled; MUTATED in place (no return value).
-#   text_parts (Dict[str, List[Tuple[str, dict]]]): shared map being filled; MUTATED in place.
-#   Return value: None (results go into the two dict arguments).
-# Per-line processing rules:
-#   - Blank lines and lines without a "|" are skipped.
-#   - json.loads failure on the payload -> line skipped; no error raised.
-#   - Non-dict payloads (list/str/int) are still appended to text_parts[sid]; only title inference cannot apply.
-#   - Parts are appended to text_parts[sid] in FILE ORDER, preserving the recorded message sequence.
-# Default metadata for dump-only sessions (no SQLite record):
-#   - agent="build", model="opencode-dump", directory="", parent_id=None, time_created=None,
-#     time_updated=None, db_source_path=<path>.
-# NULL / edge semantics:
-#   - sid[:10] on a shorter ID just returns the whole ID.
-#   - A session that already exists (from SQLite) gets parts appended but its metadata/title is untouched.
-# Exception & Failure Behavior:
-#   - Missing file path: `os.path.isfile(path)` returns early without error.
-#   - Read failures mid-file (deleted between checks, chmod change): caught by the outer try/except ->
-#     returns silently, keeping whatever was parsed before.
-# Testing Input Data Samples:
-#   - Sample Line: `"sess_100|msg_01|{\"type\":\"tool\",\"tool\":\"task\",\"state\":{\"input\":{\"description\":\"Refactor module\"}}}"`
-# Edge Cases:
-#   - Corrupt JSON payload line (e.g. malformed syntax): json.loads raises JSONDecodeError, line skipped safely.
-#   - Lines missing pipe separators or fewer than 3 parts: Skipped automatically.
-#   - Missing or unreadable file path: File existence check (`os.path.isfile(path)`) returns early without error.
+# (Line note: This function reads a plain text dump file line by line, parsing pipe-delimited records
+#  to extract session metadata and step payloads. It mutates the shared sessions and text_parts dicts
+#  in-place, so the caller does not need to capture a return value.
+#
+#  Options:
+#    - File format: Each line must be "<session_id>|<message_id>|<json_payload>"
+#    - Session title can be inferred from tool task descriptions in the payload
+#
+#  Defaults:
+#    - agent defaults to "build" for dump-only sessions (no SQLite metadata available)
+#    - model defaults to "opencode-dump" for dump-only sessions
+#    - directory defaults to "" (empty string)
+#    - parent_id defaults to None
+#    - time_created and time_updated default to None (no timestamps in text dumps)
+#    - title defaults to "Dump Session (<first 10 chars of sid>)" if no description found in payload
+#
+#  Output/effect: Mutates `sessions` dict by adding new SessionInfo entries for unseen session IDs.
+#    Mutates `text_parts` dict by appending (message_id, parsed_json_dict) tuples for every line.
+#
+#  Edge cases & errors:
+#    - Missing file path: os.path.isfile(path) returns False -> function returns immediately without error
+#    - Malformed JSON payload: json.loads() raises JSONDecodeError -> that specific line is skipped
+#    - Line with fewer than 2 pipe separators: split yields < 3 parts -> line is skipped
+#    - Blank lines or lines without pipes: skipped silently
+#    - Session ID already exists (from SQLite): metadata/title is NOT overwritten; parts are appended only
+#    - Title inference runs ONLY the first time a session ID is encountered
+#    - A non-dict JSON payload (list, string, number) is still stored in text_parts but cannot infer title
+#
+#  How to test:
+#    - Test with a valid text dump file containing one session: sessions dict should have one entry
+#    - Test with missing file path: should return without modifying sessions
+#    - Test with malformed JSON line: should skip that line and continue parsing others
+#    - Test with a session that also exists in SQLite: metadata should not be overwritten
+# )
 def load_text_dump_sessions(
+    # (Parameter note: Absolute or relative file path to the text dump file to parse.
+    #  The file must be a plain text file with one JSON payload per line, pipe-delimited.
+    #  Example: "/tmp/opencode_parts.txt"
+    #  Edge case: If the file does not exist, os.path.isfile(path) returns False and the function returns immediately.
+    #  Edge case: If the file is a directory rather than a file, os.path.isfile returns False and the function returns.
     path: str,
+    # (Parameter note: Shared dictionary of session records being built up across all sources.
+    #  This dict is MUTATED in-place; newly discovered session IDs from the text dump are added here.
+    #  Existing entries (from SQLite or prior text dumps) are preserved and not overwritten.
+    #  Key: session ID string (e.g. "sess_100")
+    #  Value: SessionInfo object
+    #  Example: {"sess_100": SessionInfo(id="sess_100", title="Refactor module", ...)}
     sessions: Dict[str, SessionInfo],
+    # (Parameter note: Shared dictionary of parsed text dump step rows, MUTATED in-place.
+    #  Key: session ID string
+    #  Value: List of (message_id, parsed_json_dict) tuples in file-order
+    #  Example: {"sess_100": [("msg_01", {"type": "tool", ...}), ("msg_02", {"type": "tool", ...})]}
+    #  This allows later functions (like fetch_part_rows) to access the raw parsed step data.
     text_parts: Dict[str, List[Tuple[str, dict]]],
 ) -> None:
-    # Check if the file exists on disk.
+    # (Line note: Check if the file exists on disk before attempting to open it.
+    #  os.path.isfile() returns True only for regular files (not directories, not symlinks to missing targets).
+    #  If the file is missing, return early to avoid FileNotFoundError.
     if not os.path.isfile(path):
         return
     try:
-        # Open and read file using UTF-8 encoding.
+        # (Line note: Open the file using UTF-8 encoding with error replacement.
+        #  errors="replace" means any invalid byte sequences are replaced with the Unicode replacement character (U+FFFD)
+        #  instead of raising a UnicodeDecodeError. This handles files with mixed encodings or binary contamination.
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
+                # (Line note: Strip leading/trailing whitespace (including the newline character) from each line.
+                #  This normalizes the line so empty lines become "" and lines with only whitespace are also "".
                 line = line.strip()
+                # (Line note: Skip blank lines and lines that do not contain the pipe delimiter "|".
+                #  A line without "|" cannot be split into the required 3 parts (sid, mid, payload).
                 if not line or "|" not in line:
                     continue
-                # Split line into maximum of 3 parts: session_id | message_id | payload.
+                # (Line note: Split the line into at most 3 parts using "|" as the delimiter.
+                #  The maxsplit=2 argument ensures that pipe characters inside the JSON payload are not split.
+                #  Example: "sess_100|msg_01|{"type":"tool"}" -> ["sess_100", "msg_01", '{"type":"tool"}']
                 parts = line.split("|", 2)
+                # (Line note: Validate that the split produced at least 3 parts.
+                #  Lines with only 1 or 2 pipes are malformed and skipped.
                 if len(parts) < 3:
                     continue
+                # (Line note: Unpack the three parts into session ID, message ID, and raw JSON payload strings.
+                #  The session ID is kept verbatim (including any spaces) as the dictionary key.
                 sid, mid, payload = parts[0], parts[1], parts[2]
                 try:
-                    # Parse raw payload string into a JSON dictionary object.
+                    # (Line note: Parse the raw JSON payload string into a Python dictionary object.
+                    #  json.loads() handles standard JSON syntax: objects {}, arrays [], strings "", numbers, booleans, null.
+                    #  If the payload is not valid JSON, this raises json.JSONDecodeError (caught by the except below).
                     obj = json.loads(payload)
                 except Exception:
+                    # (Line note: Skip lines with malformed JSON. The error is caught and the line is silently ignored.
+                    #  This prevents a single corrupt line from breaking the entire file parse.
                     continue
 
-                # Record part object under session ID key.
+                # (Line note: Ensure the text_parts entry for this session ID exists before appending.
+                #  If this is the first part seen for this session, initialize an empty list.
                 if sid not in text_parts:
                     text_parts[sid] = []
+                # (Line note: Append the (message_id, parsed_object) tuple to the session's part list.
+                #  Parts are stored in file order, preserving the original message sequence.
                 text_parts[sid].append((mid, obj))
 
-                # Infer session title and metadata if session ID is newly encountered.
+                # (Line note: Only infer session metadata (title, agent, model) the FIRST time this session ID is seen.
+                #  If the session already exists in `sessions` (e.g. loaded from SQLite earlier), skip metadata inference.
+                #  This ensures SQLite records take precedence over text dump defaults.
                 if sid not in sessions:
+                    # (Line note: Set a fallback title using the first 10 characters of the session ID.
+                    #  sid[:10] safely returns the whole string if it is shorter than 10 characters.
                     title = f"Dump Session ({sid[:10]})"
+                    # (Line note: Default agent for text dump sessions is "build" since no agent metadata is available.
                     agent = "build"
+                    # (Line note: Attempt to infer a meaningful title from the first tool task payload.
+                    #  If the payload contains type="tool" and tool="task", extract the description field.
+                    #  This gives a human-readable title instead of the generic "Dump Session (sid[:10])" fallback.
                     if obj.get("type") == "tool" and obj.get("tool") == "task":
+                        # (Line note: Safely navigate nested dict keys using .get() with no default.
+                        #  If any key is missing, .get() returns None, and the `or title` falls back to the generic title.
+                        #  Example nested path: obj["state"]["input"]["description"]
                         title = obj.get("state", {}).get("input", {}).get("description") or title
+                    # (Line note: Create a new SessionInfo object with text-dump defaults.
+                    #  Most fields are left as defaults because text dumps lack rich metadata.
+                    #  db_source_path records which file this session came from for traceability.
                     sessions[sid] = SessionInfo(
                         id=sid,
                         title=title,
                         agent=agent,
+                        # (Line note: Model is set to "opencode-dump" as a sentinel value indicating
+                        #  this session came from a text dump, not from a live OpenCode session.
                         model="opencode-dump",
                         directory="",
                         parent_id=None,
@@ -95,5 +154,9 @@ def load_text_dump_sessions(
                         time_updated=None,
                         db_source_path=path,
                     )
+    # (Line note: Catch-all exception handler for the entire file reading operation.
+    #  If any unexpected error occurs (e.g., file deleted mid-read, permission change, encoding error),
+    #  the function returns silently, keeping whatever sessions and parts were successfully parsed so far.
+    #  This ensures partial data is preferred over total loss.
     except Exception:
         pass
