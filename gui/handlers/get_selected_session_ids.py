@@ -1,3 +1,8 @@
+# Module note: Get Selected Session IDs Utility Handler.
+# Purpose: Inspects the session table and retrieves a list of selected session ID strings.
+# Plain-language overexplanation for beginners:
+# This utility helper checks which sessions in the table have checked checkboxes (or are highlighted) and returns a list of their session ID codes.
+
 from typing import List
 from PyQt6.QtCore import Qt
 
