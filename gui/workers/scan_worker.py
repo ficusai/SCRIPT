@@ -1,3 +1,8 @@
+# Module note: Database Scanning Background QThread Worker.
+# Purpose: Scans database sources for root sessions, script counts, and database metadata on a background QThread.
+# Plain-language overexplanation for beginners:
+# Reading large database files across the disk to discover conversation sessions can take time. This worker thread scans database files in the background so the main application window opens and operates without stuttering or freezing.
+
 from typing import Optional
 from PyQt6.QtCore import QThread, pyqtSignal
 from opencode_extractor import discover_all_databases, OpenCodeExtractor
