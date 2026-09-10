@@ -99,7 +99,10 @@ class MainWindow(QMainWindow):
         self.resize(1200, 780)
         self.setStyleSheet(DARK_STYLESHEET)
 
-        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "opencode-script-extractor.svg")
+        assets_dir = os.path.join(os.path.dirname(__file__), "..", "assets")
+        icon_png = os.path.join(assets_dir, "ficus.png")
+        icon_svg = os.path.join(assets_dir, "opencode-script-extractor.svg")
+        icon_path = icon_png if os.path.exists(icon_png) else icon_svg
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 

@@ -55,8 +55,11 @@ class StartupDialog(QDialog):
         self.setMinimumSize(600, 420)
         self.setStyleSheet(DARK_STYLESHEET)
 
-        # Set window icon if available
-        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "opencode-script-extractor.svg")
+        # Set window icon if available (prioritize ficus.png)
+        assets_dir = os.path.join(os.path.dirname(__file__), "..", "assets")
+        icon_png = os.path.join(assets_dir, "ficus.png")
+        icon_svg = os.path.join(assets_dir, "opencode-script-extractor.svg")
+        icon_path = icon_png if os.path.exists(icon_png) else icon_svg
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
 
