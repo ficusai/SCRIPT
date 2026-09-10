@@ -14,6 +14,7 @@ Structured Architecture Notes & Compatibility Matrix:
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
 from typing import List, Optional
 
 from opencode_extractor.constants.echo_redirect_re import ECHO_REDIRECT_RE
@@ -270,11 +271,10 @@ def parse_bash_artifacts(
         #  The 20-character minimum filters out trivial one-liners like "x=1" which are not useful as artifacts.
         if code and len(code) > 20:
             # (Line note: Generate a virtual file name using a hash of the code content.
-            #  hash(code) returns a Python integer (platform-dependent due to PYTHONHASHSEED).
-            #  abs() ensures the hash is positive. % 10000 keeps it in range 0-9999.
-            #  NOTE: The hash is NOT stable across process runs (due to PYTHONHASHSEED randomization),
-            #  so the same code may produce different file names in different runs.
-            name = f"inline_script_{abs(hash(code)) % 10000}.py"
+            #  Use deterministic SHA-256 hash to generate stable filenames across process runs.
+            #  This ensures reproducibility and prevents spurious git diffs from hash randomization.
+            h = hashlib.sha256(code.encode("utf-8")).hexdigest()[:8]
+            name = f"inline_script_{h}.py"
             # (Line note: Create a ScriptArtifact for the inline Python code.
             out.append(ScriptArtifact(
                 filePath=name,
