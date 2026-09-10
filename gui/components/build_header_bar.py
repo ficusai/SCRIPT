@@ -88,6 +88,12 @@ def build_header_bar(window) -> QHBoxLayout:
     window.db_combo.setMinimumWidth(260)
     window.db_combo.addItem("🌐 All Databases (Unified)", "all")
     from gui.handlers.on_db_source_changed import on_db_source_changed
+    # (Accessibility Note: The database dropdown lacks an accessible label. Screen readers will announce it
+    #  as "Combo Box" without context. Consider calling window.db_combo.setAccessibleName("Database source selector")
+    #  to improve screen reader navigation.)
+    # (UX Note: The dropdown shows full file paths which can be very long. Consider adding ellipsis handling
+    #  (QComboBox.setEditable(True) with a readonly line edit, or using a custom delegate) to improve readability
+    #  of long database paths.)
     # Signal Connection: Trigger database change handler whenever the user selects a different database.
     # Action on change: Reloads session table based on selected database source path.
     # Manual trigger for tests: `window.db_combo.setCurrentIndex(1)` or `window.db_combo.blockSignals(False)`.
@@ -102,8 +108,13 @@ def build_header_bar(window) -> QHBoxLayout:
     window.search_input = QLineEdit()
     window.search_input.setPlaceholderText("🔍 Search title, agent, ID...")
     window.search_input.setFixedWidth(240)
-    from gui.handlers.filter_sessions import filter_sessions
-    # Signal Connection: Filter session table list automatically as the user types text into the search field.
+    # (UX Note: Search input has a fixed width of 240px. On high-DPI displays or with larger system fonts,
+    #  the placeholder text may be truncated. Consider using a minimum width instead, or making it responsive
+    #  to font size changes. Also consider adding a clear button (QLineEdit.clearButtonEnabled) for easier
+    #  text removal.)
+    # (Accessibility Note: The search input lacks an accessible label. Screen readers will announce it as
+    #  "Edit" without context. Consider calling setAccessibleName("Search sessions") to improve accessibility.)
+    window.search_input.textChanged.connect(lambda: filter_sessions(window))
     # Event Trigger: Fires `filter_sessions(window)` event callback on every keystroke event.
     # Manual trigger for tests: `window.search_input.setText("git")` fires textChanged and re-filters live.
     window.search_input.textChanged.connect(lambda: filter_sessions(window))
@@ -125,6 +136,11 @@ def build_header_bar(window) -> QHBoxLayout:
         "With Scripts Only",
         "With Subagents",
     ])
+    # (Accessibility Note: The filter dropdown lacks an accessible label. Consider calling
+    #  window.filter_combo.setAccessibleName("Filter sessions by status") for screen reader context.)
+    # (UX Note: The filter option "Exported Sessions (✓)" uses a checkmark emoji which may not render
+    #  consistently across all platforms/fonts. Consider using a Qt-based icon or Unicode character
+    #  with broader support, or providing a text-only fallback.)
     # Signal Connection: Refilter session list whenever the selected dropdown option changes.
     # Event Trigger: Fires `filter_sessions(window)` callback when user selects a different category item.
     # Manual trigger for tests: `window.filter_combo.setCurrentIndex(2)` selects "Unexported Sessions".
@@ -134,6 +150,9 @@ def build_header_bar(window) -> QHBoxLayout:
     # Line note: Create refresh button to reload database files and session list on demand.
     # Button action & styling: Displays "🔄 Refresh" text with standard button padding (8px 16px).
     # Tester note: while a scan runs, load_sessions_async sets refresh_btn.setEnabled(False) to block double scans.
+    # (UX Note: The refresh button could show a loading animation or spinning indicator while scanning is in
+    #  progress, rather than just being disabled. This provides better visual feedback about the operation status.
+    #  Also consider adding a keyboard shortcut (Ctrl+R) for power users.)
     window.refresh_btn = QPushButton("🔄 Refresh")
     from gui.handlers.load_sessions_async import load_sessions_async
     # Signal Connection: Connect refresh button click signal to restart asynchronous background scanning thread.

@@ -58,6 +58,9 @@ def export_selected_sessions_dialog(window):
             f"No specific sessions are checked.\n\nWould you like to select and export ALL {len(window.root_sessions)} discovered sessions?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
+        # (UX Note: The dialog title "No Sessions Checked" and message are technically accurate but could be
+        #  more helpful. Consider rephrasing to: "No sessions selected. Export all {N} sessions?" with the
+        #  buttons labeled "Export All" and "Cancel" for clearer action understanding.)
         if reply == QMessageBox.StandardButton.Yes:
             # Check all session boxes and retrieve IDs again.
             select_all_sessions(window)
@@ -78,6 +81,10 @@ def export_selected_sessions_dialog(window):
         "Select Output Folder to Save Exported Sessions & Tool Calls",
         os.path.expanduser("~/Desktop"),
     )
+    # (UX Note: The folder dialog title is very long ("Select Output Folder to Save Exported Sessions & Tool Calls").
+    #  Consider shortening to "Select Export Location" for better readability, especially on smaller screens.)
+    # (UX Note: The dialog defaults to ~/Desktop which may not be appropriate for all users. Consider remembering
+    #  the last used directory via QSettings for convenience.)
     # Step 5: If user cancels folder chooser dialog (returns empty string ""), abort export operation.
     if not dest_dir:
         return
@@ -169,3 +176,15 @@ def export_selected_sessions_dialog(window):
 #   - Choose "/root/forbidden-dir" as a non-root user -> BatchExportWorker error_signal ->
 #     on_batch_error critical dialog; buttons re-enabled, bar hidden.
 #   - Toggle "Package as ZIP Archive" -> finished dialog shows a ".zip" path instead of a folder.
+# (Test Note: Missing test suite — add pytest-qt tests for:
+#   1. No sessions checked + "No" -> aborts cleanly, no buttons disabled, no dialog shown.
+#   2. No sessions checked + "Yes" -> select_all_sessions called, sids re-read, folder dialog opens.
+#   3. Empty root_sessions + "Yes" -> "No Selection" info dialog, no worker created.
+#   4. Folder dialog cancelled (empty dest_dir) -> returns early, buttons remain enabled.
+#   5. Valid export path -> buttons disabled, progress bar range set to len(sids), worker started.
+#   6. Unwritable destination -> BatchExportWorker.error_signal -> on_batch_error shows critical dialog, buttons re-enabled.
+#   7. Checkbox state propagation: verify all 7 checkbox booleans correctly passed to BatchExportWorker constructor.
+#   8. Multiple sessions selected -> progress_signal emitted per session (idx+1, total, "Processing session...").
+#   9. ZIP export mode: create_zip=True -> finished_signal output_path ends ".zip".
+#   Manual test: run GUI, select sessions, toggle checkboxes, click Export, verify dialog flow.
+# )

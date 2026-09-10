@@ -106,6 +106,10 @@ def build_script_preview_panel(window) -> QGroupBox:
     # Signal Connection & Callback: `on_script_selected(window)` reads script artifact content and displays it in code preview box.
     # Manual trigger for tests: `window.script_list.setCurrentRow(0)` fires itemSelectionChanged -> on_script_selected.
     window.script_list = QListWidget()
+    # (Accessibility Note: The script list lacks an accessible label. Consider calling
+    #  window.script_list.setAccessibleName("Extracted script files list") for screen reader context.)
+    # (UX Note: The script list uses single-selection mode by default. Consider enabling multi-selection
+    #  (ExtendedSelection) to allow users to select multiple scripts for side-by-side comparison.)
     # Signal Trigger: Display full code contents in preview box when user clicks on a script item.
     window.script_list.itemSelectionChanged.connect(lambda: on_script_selected(window))
     script_list_layout.addWidget(window.script_list)
@@ -123,6 +127,16 @@ def build_script_preview_panel(window) -> QGroupBox:
 
     # Line note: Create read-only text editing box using fixed-width monospace font to display source code preview cleanly.
     # Parameter choices: Read-only (`setReadOnly(True)`), Monospace 10pt font for aligned code formatting.
+    # (UX Note: Font size is hardcoded to 10pt with no user-adjustable controls. Users with vision impairments
+    #  or prefer larger text cannot scale the code preview independently. Consider adding font size +/- buttons
+    #  or respecting system font scaling settings.)
+    # (Accessibility Note: The code preview text edit lacks an accessible description. Consider calling
+    #  window.code_preview.setAccessibleName("Script code preview") to help screen reader users understand
+    #  the purpose of this pane.)
+    # (UX Note: There is no word wrap toggle for the code preview. Very long code lines will scroll horizontally,
+    #  which can be frustrating. Consider adding a wrap/nowrap toggle button.)
+    # (UX Note: There is no copy-to-clipboard button for the code preview. Users must manually select and copy
+    #  code, which is inconvenient. Consider adding a copy button in the preview header.)
     window.code_preview = QTextEdit()
     window.code_preview.setReadOnly(True)
     font = QFont("Monospace", 10)

@@ -99,6 +99,15 @@ def build_session_table(window) -> QGroupBox:
     window.session_table.setColumnCount(5)
     window.session_table.setHorizontalHeaderLabels(["Status", "Date", "Agent", "Scripts", "Title"])
     window.session_table.setColumnWidth(0, 110)
+    # (Accessibility Note: Table column headers lack accessible descriptions for screen readers.
+    #  Consider setting accessible descriptions via setHorizontalHeaderItem() with custom items, or using
+    #  QTableWidget.setAccessibleDescription() per column to explain: Status=Export status, Date=Creation date,
+    #  Agent=AI agent name, Scripts=Number of extracted files, Title=Session title.)
+    # (UX Note: The checkbox is placed in the Date column (column 1), which is non-standard and confusing.
+    #  Users typically expect checkboxes in the first column or in a dedicated column. Consider moving the
+    #  checkbox to column 0 (Status column) for more intuitive interaction.)
+    # (UX Note: Column headers lack tooltips. Users may not understand what "Agent" or "Scripts" means.
+    #  Consider adding tooltips via header.setToolTip() for each column to improve discoverability.)
     # Line note: Set the title column to stretch and fill remaining horizontal window space automatically.
     # Resize mode choice: QHeaderView.ResizeMode.Stretch auto-expands column 4 to fill remaining layout width.
     # Tester option: also call setColumnWidth(3, 70) to widen the Scripts count column; stretch still overrides column 4 only.
@@ -108,6 +117,10 @@ def build_session_table(window) -> QGroupBox:
     # Tester options: SelectItems (cells only) or ContiguousSelection (only adjacent Shift ranges) to restrict multi-select.
     window.session_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.session_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+    # (UX Note: No keyboard shortcut is provided to select/deselect all sessions. Power users typically expect
+    #  Ctrl+A to select all rows. Consider adding a QAction with Ctrl+A shortcut connected to select_all_sessions.)
+    # (Touch Note: Table row height uses default padding (~25px). For touch-friendly interfaces, consider
+    #  increasing row height to at least 32px via setRowHeight() to meet minimum 44x44dp touch target guidelines.)
     # Signal Connection: Update script details preview pane whenever the user highlights a different table row.
     # Connected action: `on_session_selected` loads scripts for highlighted session into right preview pane.
     # Manual trigger for tests: `window.session_table.selectRow(0)` fires itemSelectionChanged -> on_session_selected.
@@ -130,4 +143,6 @@ def build_session_table(window) -> QGroupBox:
     left_layout.addWidget(window.session_table)
     
     # Line note: Return completed panel container.
+    # (UX Note: The group box title "Conversations & Sessions" could benefit from an accelerator key mnemonic
+    #  (e.g., "&Sessions") to allow keyboard navigation to this section via Alt+S.)
     return left_group

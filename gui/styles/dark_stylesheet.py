@@ -55,6 +55,9 @@
 # RULE 6  `QHeaderView::section` (the header row of the session table)
 #   - background-color: #181825  -> header cells share the dark crust fill.
 #   - color: #a6adc8             -> muted blue-grey header labels.
+# (UX Note: The header text color #a6adc8 on background #181825 has a contrast ratio of approximately 3.5:1,
+#   which fails WCAG AA requirements (minimum 4.5:1 for normal text). Consider lightening the header text
+#   color to #b4befe or darker to meet accessibility standards.)
 #   - padding: 6px               -> 6px padding inside each header cell.
 #   - border: 1px solid #313244  -> grid lines between header cells.
 #   - font-weight: bold          -> "Status/Date/Agent/Scripts/Title" labels are bold.
@@ -127,6 +130,22 @@
 #   Used by this stylesheet: #1e1e2e, #181825, #313244, #45475a, #585b70, #89b4fa, #b4befe, #11111b, #cdd6f4, #a6adc8.
 #   Used elsewhere, not in this file: #a6e3a1 (green "✓ EXPORTED" text in gui/handlers/filter_sessions.py line 82).
 #   Not used anywhere in the project: #f38ba8 (red) and #f9e2af (yellow); adding them is safe, nothing overrides them.
+#
+# (UX Note: Global font size is fixed at 13px with no support for system font scaling. Users who have set
+#   their OS to use larger fonts will find the application text artificially constrained. Consider detecting
+#   the system font size and adjusting accordingly, or providing a settings dialog to change font size.)
+#
+# (Accessibility Note: Focus indicators rely solely on border color changes (#89b4fa). Users with color
+#   blindness may struggle to distinguish focused vs unfocused states. Consider adding a secondary focus
+#   indicator such as a glow effect, inner shadow, or width change to make focus more discernible.)
+#
+# (Touch Note: Button padding is 8px vertical x 16px horizontal, creating touch targets approximately
+#   32px tall. This falls short of the recommended 44x44dp minimum for touch interfaces (iOS HIG,
+#   Material Design). Consider increasing padding to 12px 24px for better touch accessibility.)
+#
+# (Touch Note: Checkbox indicators are 18x18px, well below the 24x24px minimum recommended for touch
+#   targets. This makes checkboxes difficult to click on touchscreens. Consider increasing to at least
+#   24x24px via the QCheckBox::indicator width/height properties.)
 
 # Line note: DARK_STYLESHEET holds the complete multi-line CSS rules applied to the application window via `self.setStyleSheet()`.
 # Tester note: this is a plain str; print it to inspect, or concatenate extra rules onto it to layer styling.

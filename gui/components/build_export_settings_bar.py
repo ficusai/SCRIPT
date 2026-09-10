@@ -62,13 +62,22 @@ def build_export_settings_bar(window) -> QGroupBox:
     # Line note: Checkbox option to include session transcript text and tool execution logs.
     # Parameter default: Checked (`setChecked(True)`). Exports `transcript.md` and `tool_calls.json`.
     # Tester note: uncheck this to produce script-only exports without chat transcripts.
+    # (UX Note: The checkbox label "Export Tool Calls & Transcripts" is verbose and may not be clear to
+    #  non-technical users. Consider shortening to "Include Transcripts" with a tooltip explaining that
+    #  this exports conversation history and tool execution logs.)
     window.export_tool_calls_cb = QCheckBox("Export Tool Calls & Transcripts")
     window.export_tool_calls_cb.setChecked(True)
     export_layout.addWidget(window.export_tool_calls_cb)
+    # (Accessibility Note: This checkbox and subsequent export option checkboxes lack tooltips explaining
+    #  what each option does. Adding tooltips would help non-technical users understand the impact of
+    #  toggling each option before exporting.)
 
     # Line note: Checkbox option to save individual code script files found inside sessions.
     # Parameter default: Checked (`setChecked(True)`). Extracts `.py`, `.sh`, `.js`, `.ts` files.
     # Tester note: unchecking this alongside the tool-calls box would empty the export; the dialog warns.
+    # (UX Note: The checkbox label "Export Script Files" is ambiguous - it could mean "export the list of
+    #  script filenames" vs "export the actual code content". Consider renaming to "Include Code Scripts"
+    #  for clarity.)
     window.export_scripts_cb = QCheckBox("Export Script Files")
     window.export_scripts_cb.setChecked(True)
     export_layout.addWidget(window.export_scripts_cb)
@@ -90,6 +99,9 @@ def build_export_settings_bar(window) -> QGroupBox:
     # Line note: Checkbox option to compress all exported files into a single .zip archive.
     # Parameter default: Unchecked (`setChecked(False)`). If enabled, creates `<export_dir>/opencode_export_<timestamp>.zip`.
     # Tester note: this is the ONLY option that defaults to off; enable it to test the zip code path.
+    # (UX Note: The checkbox label "Package as ZIP Archive" uses technical terminology ("archive").
+    #  Non-technical users may not understand what a ZIP file is. Consider adding a tooltip or
+    #  relabeling to "Compress to ZIP file (optional)" for clarity.)
     window.zip_cb = QCheckBox("Package as ZIP Archive")
     export_layout.addWidget(window.zip_cb)
 
@@ -106,6 +118,12 @@ def build_export_settings_bar(window) -> QGroupBox:
 
     # Line note: Create primary action button to begin exporting selected sessions.
     # Button styling: Object name `exportButton` targets accent styling in stylesheet (#89b4fa background, 14px font size).
+    # (UX Note: The export button text "💾 Export Selected Sessions & Tool Calls..." is very long and may be
+    #  truncated on smaller screens or with larger system fonts. Consider shortening to "Export Selected"
+    #  or using an icon-only button with a tooltip for compact layouts.)
+    # (Accessibility Note: The export button lacks an accessible description explaining what will be exported.
+    #  Consider calling setAccessibleDescription("Export selected sessions to the chosen folder") for screen
+    #  reader users who may not understand the button's full purpose from the label alone.)
     window.export_btn = QPushButton("💾 Export Selected Sessions & Tool Calls...")
     window.export_btn.setObjectName("exportButton")
     # Signal Connection: Open file chooser dialog and begin extraction when user clicks export button.

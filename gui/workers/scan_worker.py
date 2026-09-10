@@ -37,6 +37,10 @@ class ScanWorker(QThread):
     finished_signal = pyqtSignal(list, dict, list)
     # Signal emitted if an error happens during scanning, sending back the exception string text.
     error_signal = pyqtSignal(str)
+    # (UX Note: The ScanWorker emits only finished and error signals, with no progress signal during scanning.
+    #  For databases with many sessions, the user may experience a long delay with no feedback, potentially
+    #  thinking the application has frozen. Consider adding a progress_signal(int, int, str) to report
+    #  scanning progress (e.g., "Scanning database 1 of 3...") for better perceived performance.)
 
     # Sets up the worker and remembers which database path to scan (defaults to "all").
     # Example testing values: db_path="all", db_path="/tmp/opencode_test.db".
@@ -51,6 +55,10 @@ class ScanWorker(QThread):
             # Step 1: Discover available database locations on the computer system.
             db_sources = discover_all_databases()
             # Step 2: Open the database extractor tool safely within a context manager.
+            # (Performance Note: discover_all_databases() is called AND OpenCodeExtractor is constructed separately.
+            #  OpenCodeExtractor.__init__() calls discover_all_databases() AGAIN internally when db_path is "all",
+            #  resulting in redundant filesystem scanning. Consider passing db_sources directly to OpenCodeExtractor
+            #  or having the constructor accept an already-discovered source list to eliminate the duplicate scan.)
             with OpenCodeExtractor(self.db_path) as ex:
                 # Step 3: Fetch all top-level chat session objects from the database.
                 roots = ex.root_sessions()
@@ -119,3 +127,28 @@ class ScanWorker(QThread):
 #   - High volume: DB with 1000+ sessions -> window stays draggable while scanning.
 #   - App exit mid-scan: close the window while run() is active -> no orphan process remains after
 #     the thread finishes; confirm no TypeError on the still-connected lambda receivers.
+# (Test Note: Missing test suite — add pytest tests for:
+#   1. Empty DB: create empty SQLite DB, ScanWorker("/tmp/empty.db") -> finished_signal emitted with roots=[], counts={}, sources=[].
+#   2. Missing file: ScanWorker("/tmp/missing.db") -> error_signal emitted with FileNotFoundError string.
+#   3. Corrupt DB: ScanWorker("/tmp/corrupt.db") -> error_signal emitted with sqlite3.DatabaseError string.
+#   4. Permission denied: chmod 000 a copy of a DB -> error_signal with PermissionError string.
+#   5. Multi-DB scan (db_path="all"): verify db_sources list contains all discovered databases.
+#   6. Session count accuracy: verify script_counts dict values match actual extract_scripts() output for each session.
+#   7. Thread lifecycle: after .start(), thread.isRunning() is True; after finished_signal, isFinished() is True.
+#   8. Signal payload types: assert isinstance(roots, list), isinstance(counts, dict), isinstance(db_sources, list).
+#   9. Context manager usage: verify OpenCodeExtractor.__enter__/__exit__ called correctly inside run().
+#   10. Memory leak: scan same DB 10 times in sequence -> verify no growing connection pool or session cache.
+#   Isolated test command:
+#   ```python
+#   from gui.workers.scan_worker import ScanWorker
+#   from PyQt6.QtCore import QCoreApplication
+#   import sys
+#   app = QCoreApplication(sys.argv)
+#   worker = ScanWorker("all")
+#   results = []
+#   def capture(roots, counts, sources): results.append((roots, counts, sources))
+#   worker.finished_signal.connect(capture)
+#   worker.start(); app.exec()
+#   assert len(results) == 1
+#   ```
+# )

@@ -88,7 +88,15 @@ class BatchExportWorker(QThread):
                 for idx, sid in enumerate(self.session_ids):
                     # Emit progress update signal across thread boundary to update status label and progress bar.
                     # Signal payload: (current_step: int, total_steps: int, status_text: str)
+                    # (UX Note: Progress messages like "Processing session 1/3..." are technical and not very helpful.
+                    #  Consider including more descriptive context such as the session title or a brief summary
+                    #  (e.g., "Exporting: Refactor plan (1/3)...") to help users understand what is happening.)
                     self.progress_signal.emit(idx + 1, total, f"Processing session {idx + 1}/{total}...")
+                    # (Performance Note: Bundles are extracted sequentially in a for-loop. Each extract_session_bundle()
+                    #  call loads the session tree, parses all parts, and builds the bundle. For 100+ sessions, this
+                    #  is strictly serial. Consider parallelizing bundle extraction with concurrent.futures.ThreadPoolExecutor
+                    #  (respecting SQLite's max_connections limit) to reduce total wall-clock time. The I/O-bound
+                    #  nature of disk reads makes threading effective here.)
                     bundle = ex.extract_session_bundle(sid)
                     bundles.append(bundle)
 

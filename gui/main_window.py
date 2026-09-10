@@ -56,6 +56,13 @@ from gui.handlers.load_sessions_async import load_sessions_async
 #           (QCheckBox), export_btn (QPushButton)
 #   Footer:  status_lbl (QLabel), progress_bar (QProgressBar)
 class MainWindow(QMainWindow):
+    # (Accessibility Note: No accessible name or objectName is set on the main window for screen readers.
+    #  Consider calling self.setObjectName("MainWindow") and setting an accessible description via
+    #  self.setAccessibleDescription("OpenCode Session Script Extractor - browse and export AI conversation sessions")
+    #  to improve screen reader navigation.)
+    # (UX Note: No global keyboard shortcuts are defined. Users cannot access common actions like Refresh (Ctrl+R),
+    #  Export (Ctrl+E), or Search focus (Ctrl+F) via keyboard. Adding QAction objects with shortcuts would improve
+    #  keyboard-only usability significantly.)
     # Function note: Initializes the main window, configures window dimensions, sets dark theme styles, and prepares state variables.
     # Why it exists: Sets up the initial state data structures and triggers window construction and background DB scanning.
     # Layout settings: Sets 1200px width and 780px height; applies DARK_STYLESHEET CSS styling rules.
@@ -71,6 +78,9 @@ class MainWindow(QMainWindow):
         # Layout dimensions: Window is resizable; minimum recommended resolution is 1024x600 pixels.
         # Tester options: resize(1400, 900) for a bigger default; resize(1024, 600) to test the smallest usable size.
         # To enforce a hard minimum instead of a suggestion, call self.setMinimumSize(1024, 600) right here.
+        # (UX Note: No minimum size is enforced. On low-resolution screens (<1024x600), the UI may become unusable
+        #  with truncated text and overlapping widgets. Consider adding self.setMinimumSize(1024, 600) to prevent
+        #  this. Also consider storing the last window geometry in QSettings for persistence across restarts.)
         self.resize(1200, 780)
         # Line note: Apply the dark stylesheet colors across all window components.
         # Styling parameter: DARK_STYLESHEET contains dark background (#1e1e2e) and blue accent palette (#89b4fa).
@@ -147,3 +157,18 @@ class MainWindow(QMainWindow):
         # Line note: Add export settings options bar and bottom status bar footer.
         layout.addWidget(build_export_settings_bar(self))
         layout.addLayout(build_status_footer(self))
+        # (UX Note: The initial scan triggered by load_sessions_async(self) provides no visual progress feedback.
+        #  The user sees an empty window with no indication that scanning is in progress. Consider showing a
+        #  splash message or enabling the progress bar during the initial scan, similar to what is done during
+        #  batch exports. This reduces uncertainty about whether the app has frozen.)
+# (Test Note: Missing test suite — zero pytest/unit tests exist in this project. Add integration tests for:
+#   1. Startup sequence: app launches -> ScanWorker starts automatically -> on_sessions_loaded fires -> table populated.
+#   2. Signal-slot connections: verify scan_thread.finished_signal and error_signal are connected before .start().
+#   3. Thread safety: no widget access from background threads (ScanWorker/BatchExportWorker/ExtractWorker only emit signals).
+#   4. State consistency: after scan, window.db_sources, root_sessions, script_counts, exported_sids all populated.
+#   5. Window close during scan: verify no orphan threads linger and no dangling signal connections cause crashes.
+#   6. Multi-database discovery: verify db_combo populated with "All Databases" + per-source entries.
+#   7. Concurrent operations: can user click Export while ScanWorker is still running? (refresh_btn disabled).
+#   8. Memory: verify no unbounded growth of _conns dict or session caches across multiple scans.
+#   Run manual test: python3 -m gui.main_window (requires DISPLAY) or QT_QPA_PLATFORM=offscreen python3 -c "from gui.main_window import MainWindow; import sys; app = ...; w = MainWindow(); w.show()"
+# )
