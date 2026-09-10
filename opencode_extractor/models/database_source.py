@@ -2,76 +2,44 @@
 Holds details about a session database or dump file source.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import dataclass decorator from standard dataclasses library
 from dataclasses import dataclass
 
 
-# A data container (dataclass) holding information about an OpenCode database or transcript dump file found on the computer.
+# Class Purpose & Overview:
+# Data class container holding information about an OpenCode database or transcript dump file discovered on disk.
 #
-# ============================================================================
-# FIELD-BY-FIELD SPECIFICATION
-# ============================================================================
-#   Field         Python type   Required?  Default      Valid test values
-#   -------       -----------   --------   ----------   -------------------
-#   label         str           YES        (none)       "Primary Local SSD Database (5.2 MB)",
-#                                                      "External Drive DB (backup1) (1.0 MB)",
-#                                                      "Text Dump: opencode_parts.txt (3 sessions, 0.2 MB)"
-#   path          str           YES        (none)       "/home/user/.local/share/opencode/opencode.db",
-#                                                      "/run/media/user/backup/utils/opencode.db",
-#                                                      "/home/user/parts.txt"
-#   size_mb       float         YES        (none)       5.2, 0.0, 1200.75
-#   kind          str           NO         "sqlite"     "sqlite" | "text_dump"   (any other value
-#                                                      would fall through to the else-branch and be
-#                                                      ignored by load_sessions/handled nowhere else)
-#   session_count int           NO         0            0, 1, 42, 100000
+# Field Specification & Types:
+#   - label: str (Required) Human-readable display banner (e.g. "Primary Local SSD Database (5.2 MB)", "Text Dump: opencode_parts.txt").
+#   - path: str (Required) Absolute filesystem path to the database or text dump file.
+#   - size_mb: float (Required) File size measured in Megabytes (MB).
+#   - kind: str (Optional, default="sqlite") Source type category: "sqlite" for SQLite DBs or "text_dump" for pipe-delimited text transcript files.
+#   - session_count: int (Optional, default=0) Total count of conversation sessions stored in this database source.
 #
-# ============================================================================
-# FIELD POPULATION POINTS (where these get filled in the pipeline)
-# ============================================================================
-#   - discover_all_databases() constructs all four REAL instances:
-#       label        = descriptive banner built from size_mb and location heuristics
-#                      (contains ".local/share/opencode/opencode.db" -> Primary Local;
-#                       contains "md.obsidian" -> Obsidian Flatpak; contains "imported_databases"
-#                       -> Imported Backup DB; contains "/run/media/" -> External Drive DB;
-#                       otherwise "Database: <basename>"). Text dumps get
-#                       "Text Dump: <basename> (<n> sessions, <size> MB)".
-#       path         = the fully-glob-expanded filesystem path.
-#       size_mb      = os.path.getsize(p) / (1024*1024).
-#       kind         = "sqlite" or "text_dump" depending on which loop found the file.
-#       session_count= for sqlite: SELECT COUNT(*) FROM session (read-only URI); on ANY exception
-#                      the count stays 0. For text dumps: number of unique <session_id> fields.
-#   - OpenCodeExtractor.__init__ builds a SYNTHETIC instance for an --db path that exists on disk
-#     but was not discovered: DatabaseSource(label=os.path.basename(db_path), path=db_path,
-#     size_mb=0, kind="sqlite"). NOTE this fallback hard-codes kind="sqlite" (even for text files).
-#   - find_database() (discovery) also returns DatabaseSource instances from the same discovery list.
+# Edge Cases & Defaults:
+#   - Synthetic instances: Un-discovered --db paths default size_mb to 0.0 and kind to "sqlite".
+#   - Unreadable databases: session_count defaults to 0 if counting sessions fails due to database errors.
 #
-# ============================================================================
-# CONSUMERS OF EACH FIELD
-# ============================================================================
-#   label      -> CLI discovery table  "  - [  42 sessions] [sqlite] Primary Local ..."
-#   path       -> sqlite3 connect (connect_sqlite) / text file open (load_text_dump_sessions);
-#                 also duplicated into SessionInfo.db_source_path and artifact db_source_path fields.
-#   size_mb    -> shown in the label banner only.
-#   kind       -> selects parser: "sqlite" waves through connect_sqlite + SQL, "text_dump" waves
-#                 through load_text_dump_sessions. Anything else is skipped by load_sessions.
-#   session_count -> sorting (results.sort by -session_count) and the discovery table.
-#
-# ============================================================================
-# BOUNDARY & EDGE CASE TESTS
-# ============================================================================
-#   - Path with spaces `/home/user/My Documents/opencode.db`: correctly preserved without escaping errors.
-#   - Unreadable/zero-byte database file: size_mb is 0.0, session_count is 0.
-#   - Corrupt sqlite or missing 'session' table: OperationalError swallowed -> session_count 0, still listed.
-#   - Duplicate path matched by two glob patterns: deduplicated by the `found_paths` set upstream.
-#   - Equality: dataclass default eq compares all five fields; no ordering is defined.
-#
-# TESTING SAMPLE INSTANTIATION:
-#   db_src = DatabaseSource(label="Local DB", path="/path/to/opencode.db", size_mb=5.2, kind="sqlite", session_count=42)
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.models.database_source import DatabaseSource; db = DatabaseSource(label="Local", path="/a.db", size_mb=1.5); print(db.kind, db.session_count)' (outputs "sqlite 0")
+
+# Dataclass decorator generating constructor __init__, repr, and comparison methods automatically
 @dataclass
 class DatabaseSource:
+    # Line explanation: Descriptive title label string for display in CLI listings
     label: str
+    
+    # Line explanation: Absolute string path pointing to the database or transcript dump file on disk
     path: str
+    
+    # Line explanation: Floating point number representing the total file size in Megabytes (MB)
     size_mb: float
+    
+    # Line explanation: Category kind string identifying file type; options: "sqlite" (default) or "text_dump"
     kind: str = "sqlite"
+    
+    # Line explanation: Integer counter storing total number of valid AI sessions contained in the database source (default 0)
     session_count: int = 0
