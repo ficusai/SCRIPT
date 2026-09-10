@@ -1,3 +1,8 @@
+# Module note: Script Selection Event Handler.
+# Purpose: Formats and displays code content or patch diffs in the code preview editor when a script item is clicked.
+# Plain-language overexplanation for beginners:
+# When the user clicks on a script file name in the right panel list, this handler retrieves its code content (or edit diffs) and formats it in the text preview box below.
+
 from PyQt6.QtCore import Qt
 from opencode_extractor.models import ScriptArtifact
 
