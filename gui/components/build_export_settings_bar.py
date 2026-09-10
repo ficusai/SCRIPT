@@ -1,3 +1,9 @@
+# Module note: Export Settings Bar Component Builder.
+# Purpose: Constructs and returns the bottom panel containing export configuration checkboxes and the main Export action button.
+# Plain-language overexplanation for beginners:
+# This file creates the toolbar at the bottom of the window where users decide HOW they want their files saved.
+# Users can check or uncheck options like creating ZIP files, keeping original folder paths, or saving edit diff patches.
+
 # Line note: Import UI widgets (group boxes, layout containers, check box toggles, push buttons) from PyQt6.
 from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QCheckBox, QPushButton
 # Line note: Import handler function for launching the export settings and folder selection dialog.
