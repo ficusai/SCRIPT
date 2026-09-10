@@ -1,75 +1,126 @@
-# Desktop shortcut configuration file used by Linux desktop environments to launch the application from menus or the desktop.
-# Purpose: Integrates OpenCode Script Extractor into system application menus (GNOME, KDE, XFCE) and desktop shortcuts.
-# Layout Context: Launches launcher script that opens the 1200x780 pixel desktop GUI styled with dark theme (#1e1e2e background).
-# Event Callback Flow: User double-click triggers OS launcher event -> executes `Exec` script -> launches Python Qt event loop.
-# Testing value suggestions: Copy to `~/.local/share/applications/` or `~/Desktop/`. Test launch via terminal using `gtk-launch opencode-script-extractor.desktop` or `desktop-file-validate opencode-script-extractor.desktop`.
+# Desktop Entry Specification File
+# Purpose: Integrates the OpenCode Script Extractor into Linux desktop application launcher menus (GNOME, KDE, XFCE, Cinnamon).
+# Format: FreeDesktop.org Desktop Entry Specification standard key-value file format.
+#
+# Testing and installation commands for system integration:
+#   - Validate syntax: `desktop-file-validate opencode-script-extractor.desktop`
+#   - Install user shortcut: `cp opencode-script-extractor.desktop ~/.local/share/applications/`
+#   - Update desktop database: `update-desktop-database ~/.local/share/applications/`
+#   - Launch via desktop launcher service: `gtk-launch opencode-script-extractor.desktop`
+#   - Install system-wide: `sudo desktop-file-install --dir=/usr/share/applications opencode-script-extractor.desktop`
+#
+# Optional FreeDesktop keys that can be added (not currently active):
+#   - `Keywords=opencode;script;extractor;sqlite;export;` : Search keywords for launcher search.
+#   - `StartupWMClass=OpenCode Script Extractor` : Window manager class name to map running window to dock icon.
+#   - `NoDisplay=true` : Keep application installed but hide from application launcher menus.
+#   - `Hidden=true` : Completely mark application as deleted/disabled in desktop environment.
+#   - `MimeType=application/x-sqlite3;text/plain;` : File types associated with this application for right-click opening.
+#   - `Version=1.5` : Desktop Entry Specification specification version marker.
 
-# Installation & validation commands a tester should run:
-#   - desktop-file-validate opencode-script-extractor.desktop   : syntax check; prints warnings for wrong key values.
-#   - desktop-file-install opencode-script-extractor.desktop     : install into the system applications folder.
-#   - cp opencode-script-extractor.desktop ~/.local/share/applications/ : install for the current user only.
-#   - update-desktop-database ~/.local/share/applications/        : refresh the menu database after installing.
-#   - gtk-launch opencode-script-extractor                        : launch from terminal (name without the .desktop suffix).
-#   - gtk-launch opencode-script-extractor.desktop                : some gtk-launch versions accept the full filename too.
-
-# Field codes that can be appended to Exec to receive dropped files/URLs:
-#   - %f / %F : single / multiple file paths dropped onto the launcher icon.
-#   - %u / %U : single / multiple URLs passed to the app.
-#   - %%      : a literal percent sign.
-#   Without one of these codes the launcher ignores anything dropped onto its icon.
-#   Example: `Exec=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh %F`.
-
-# Extra keys a tester may ADD (optional, not currently present):
-#   - Keywords=export;scripts;opencode; : extra search terms shown in GNOME overview.
-#   - StartupWMClass=OpenCode Script Extractor : lets the shell match this entry to the running window.
-#   - NoDisplay=true : keep the entry installed but hide it from application menus.
-#   - Hidden=true : fully hide the entry everywhere.
-#   - Version=1.0   : FreeDesktop spec version marker; most environments ignore it.
-#   - SingleMainWindow=false : KDE windowing hint; ignored by GNOME/XFCE.
+# Line 32 explanation: `[Desktop Entry]`
+# - What it does: Defines the main header section group for the desktop launcher configuration.
+# - Options: `[Desktop Entry]` is mandatory. Additional group sections can exist like `[Desktop Action ActionName]` for right-click context menu shortcuts.
+# - Default value: `[Desktop Entry]`
+# - Output / Side effect: Identifies file format to Linux desktop menu parsers.
+# - Edge cases & Errors: If missing or misspelled, desktop managers fail to parse the desktop file.
+# - How to test: Validate with `desktop-file-validate opencode-script-extractor.desktop`.
 [Desktop Entry]
-# Line note: Specifies that this configuration entry launches a desktop software application program. Valid options: Application, Link, Directory.
+
+# Line 35 explanation: `Type=Application`
+# - What it does: Specifies the fundamental item type of this desktop shortcut.
+# - Options:
+#   * `Type=Application` (Current default): Launches an executable binary or shell script.
+#   * `Type=Link`: Opens a web URL link in the default internet browser.
+#   * `Type=Directory`: Defines folder icon metadata for file managers.
+# - Default value: `Application`
+# - Output / Side effect: Instructs desktop environment to treat entry as runnable software.
+# - Edge cases & Errors: Invalid type value causes desktop validation error and hides shortcut from application launcher.
+# - How to test: Run `desktop-file-validate opencode-script-extractor.desktop`.
 Type=Application
 
-# Line note: The display name text string shown under the desktop icon and in the operating system application menu.
-# Tester option: change to any localized string, e.g. "OpenCode Extractor"; shown in GNOME "Show Applications".
+# Line 40 explanation: `Name=OpenCode Script Extractor`
+# - What it does: The display name text string shown under the desktop icon, in taskbars, and in launcher search menus.
+# - Options: Any text string (e.g. `Name=OpenCode Extractor`). Localized variants like `Name[fr]=Extracteur OpenCode` or `Name[es]=Extractor OpenCode` can be added beneath it.
+# - Default value: `OpenCode Script Extractor`
+# - Output / Side effect: Renders application title in system desktop UI.
+# - Edge cases & Errors: If empty or missing, desktop environment falls back to displaying filename `opencode-script-extractor.desktop`.
+# - How to test: Search for "OpenCode Script Extractor" in GNOME overview or KDE app launcher.
 Name=OpenCode Script Extractor
 
-# Line note: A helpful description text string shown when hovering the mouse cursor over the application icon in launcher menus.
-# Tester option: any free-form one-line description; shown as tooltip in some environments.
+# Line 44 explanation: `Comment=Extract scripts and code files from OpenCode session history and subagents`
+# - What it does: Explanatory tooltip text displayed when hovering the mouse cursor over the application icon in launcher menus.
+# - Options: Any freeform descriptive text line. Localized variants like `Comment[fr]=...` or `Comment[de]=...` are also supported.
+# - Default value: `Extract scripts and code files from OpenCode session history and subagents`
+# - Output / Side effect: Displays tooltip box on hover.
+# - Edge cases & Errors: If empty or omitted, no tooltip is shown on hover.
+# - How to test: Hover cursor over icon in GNOME Applications view or system main menu.
 Comment=Extract scripts and code files from OpenCode session history and subagents
 
-# Line note: The exact executable command path triggered when double-clicking or selecting this application shortcut.
-# Valid options: Absolute path to launcher script `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh`.
-# Signal & Event Flow: System desktop shell executes script, starting Python PyQt6 event loop and UI layout rendering.
-# What happens if path is invalid or non-existent: Desktop launcher displays "Failed to launch" or "Command not found" error dialog.
-# Tester option: append Qt flags here, e.g. `Exec=/home/.../opencode-script-extractor.sh -platform offscreen`.
-# Field-code option: append ` %F` to accept dropped files (see top of file).
+# Line 52 explanation: `Exec=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh`
+# - What it does: Defines the exact absolute file path command executed when the user launches this desktop shortcut.
+# - Options & Field Code variants:
+#   * Absolute path: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh`
+#   * With field code `%f`: `Exec=/home/.../opencode-script-extractor.sh %f` (passes a single dropped file path).
+#   * With field code `%F`: `Exec=/home/.../opencode-script-extractor.sh %F` (passes multiple dropped file paths).
+#   * With field code `%u`: `Exec=/home/.../opencode-script-extractor.sh %u` (passes a single URL).
+#   * With field code `%U`: `Exec=/home/.../opencode-script-extractor.sh %U` (passes multiple URLs).
+#   * With Qt flags: `Exec=/home/.../opencode-script-extractor.sh -platform offscreen`
+# - Default value: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh`
+# - Output / Side effect: Launches the bash script which in turn executes Python PyQt6 GUI main window (`gui/__main__.py`).
+# - Edge cases & Errors: If path does not exist or lacks execute permissions (`chmod +x`), OS shows "Failed to launch application" dialog or error in system log.
+# - How to test: Run `gtk-launch opencode-script-extractor.desktop` in terminal to simulate desktop launch.
 Exec=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/opencode-script-extractor.sh
 
-# Line note: The starting working directory folder location where the program process should begin running on disk.
-# Valid options: Absolute directory path `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR`.
-# What happens if path is invalid: Application process defaults to user home directory (`~`).
-# Why it matters: the launcher script computes its own folder anyway, so this is a safety fallback; scripts opened
-# with relative paths resolve against this directory when supported.
+# Line 59 explanation: `Path=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR`
+# - What it does: Specifies the initial working directory folder where the launched process will execute.
+# - Options: Any valid absolute folder directory path (e.g. `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR`).
+# - Default value: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR`
+# - Output / Side effect: Sets initial working directory context for the launcher shell process.
+# - Edge cases & Errors: If folder directory path does not exist, system defaults working directory to user home directory (`~`).
+# - How to test: Test script relative file access when starting application from menu.
 Path=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR
 
-# Line note: The visual icon graphic shown next to the application name in desktop menus and taskbar launchers.
-# Valid icon name options: `utilities-terminal`, `system-file-manager`, `python3`, `text-editor`.
-# Tester option: use any installed icon name or an absolute path to a PNG/SVG, e.g. `Icon=/home/ficus-pro/Pictures/app.png`.
-# What happens if icon is invalid: Desktop environment falls back to generic system application icon.
+# Line 65 explanation: `Icon=utilities-terminal`
+# - What it does: The visual icon image graphic shown next to the application name in launcher menus and dock taskbars.
+# - Options:
+#   * Theme icon name: `utilities-terminal` (Current default), `system-file-manager`, `python3`, `text-editor`, `utilities-system-monitor`.
+#   * Absolute path to PNG/SVG file: `Icon=/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/gui/assets/icon.png`.
+# - Default value: `utilities-terminal`
+# - Output / Side effect: Renders terminal icon graphic in desktop menu panels and window titles.
+# - Edge cases & Errors: If icon name or path cannot be resolved, system falls back to a generic default application gear icon.
+# - How to test: Inspect icon graphic rendered in GNOME shell dock or KDE taskbar.
 Icon=utilities-terminal
 
-# Line note: Controls whether a command terminal window opens alongside the visual window.
-# Valid options: `false` (hides terminal, opens 1200x780 GUI window only), `true` (opens terminal window for stdout/stderr debug logs).
-# Tester option: set to `true` temporarily to capture python tracebacks and print() output while debugging.
+# Line 70 explanation: `Terminal=false`
+# - What it does: Determines whether a visible command line terminal window (like xterm or gnome-terminal) opens to display stdout/stderr log output while the application runs.
+# - Options:
+#   * `Terminal=false` (Current default): Runs GUI application silently without opening a terminal window.
+#   * `Terminal=true`: Opens terminal window displaying Python print() outputs and log tracebacks (useful during development/debugging).
+# - Default value: `false`
+# - Output / Side effect: Suppresses auxiliary terminal window creation.
+# - Edge cases & Errors: If `Terminal=true` is set on a headless server without a terminal emulator installed, launch may fail.
+# - How to test: Temporarily set `Terminal=true`, double click shortcut, and verify terminal window pops up alongside GUI.
 Terminal=false
 
-# Line note: The category folder classification in the Linux desktop application menu where this shortcut will appear.
-# Valid options: `Development;`, `Utility;`, `System;`, `IDE;`. Multiple categories are separated by semicolons:
-# e.g. `Categories=Development;Utility;`.
+# Line 76 explanation: `Categories=Development;`
+# - What it does: Assigns classification category tags used by OS desktop menus to organize applications into submenus (e.g. Development, Utilities).
+# - Options: Standard categories separated by semicolons:
+#   * `Categories=Development;` (Current default)
+#   * `Categories=Development;Utility;`
+#   * `Categories=System;IDE;`
+# - Default value: `Development;`
+# - Output / Side effect: Places application under "Programming" or "Development" submenu in Linux desktop application menus.
+# - Edge cases & Errors: Unknown category tags are ignored or placed into "Other" menu group.
+# - How to test: Check menu group placement in KDE Application Launcher or XFCE Whisker Menu.
 Categories=Development;
 
-# Line note: Shows a loading pointer cursor or visual startup indicator while the application is launching.
-# Valid options: `true` (displays desktop startup notification cursor), `false` (launches quietly without cursor change).
-# Tester option: set to `false` if the app starts slowly and the desktop keeps showing the watch cursor.
+# Line 81 explanation: `StartupNotify=true`
+# - What it does: Enables visual desktop startup notification (shows spinning cursor or taskbar animation while the application process initializes).
+# - Options:
+#   * `StartupNotify=true` (Current default): Shows busy loading cursor until main GUI window displays.
+#   * `StartupNotify=false`: Launches process silently without mouse cursor feedback.
+# - Default value: `true`
+# - Output / Side effect: Displays loading mouse cursor feedback during launch startup sequence.
+# - Edge cases & Errors: If application fails to signal startup completion, watch cursor may spin for 10 seconds before timing out.
+# - How to test: Observe cursor state immediately after clicking application launcher entry.
 StartupNotify=true
