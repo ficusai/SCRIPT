@@ -1,3 +1,9 @@
+# Module note: Status Footer Component Builder.
+# Purpose: Constructs and returns the bottom window status bar showing application status messages and loading progress.
+# Plain-language overexplanation for beginners:
+# This file builds the status footer bar at the very bottom of the application window.
+# It includes a text label for status messages (like "Ready" or "Scanning...") and an animated progress bar that shows progress during background operations.
+
 # Line note: Import layout manager, text status labels, and visual progress bar widgets from PyQt6.
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QProgressBar
 
