@@ -1,3 +1,8 @@
+# Module note: Sessions Loaded Handler Callback.
+# Purpose: Updates database dropdown options and session table view after background scanning completes.
+# Plain-language overexplanation for beginners:
+# When background scanning finishes reading database files, this callback updates the database choices menu, sets status text, and populates the session table with matching rows.
+
 from opencode_extractor import load_exported_session_ids
 from gui.handlers.filter_sessions import filter_sessions
 
