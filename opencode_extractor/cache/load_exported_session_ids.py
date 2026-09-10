@@ -1,5 +1,14 @@
 """
 Returns set of exported session IDs.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (Export metadata cache file)
+- Formats Handled: Python Set datastructure of string session IDs
+- Export Modes Supported: In-memory set lookup for fast membership checking
+- Framework Possibilities:
+    - CLI: Fast deduplication check across thousands of target sessions
+    - Batch Processing: Bulk exclusion filter for session iterator loops
+    - Web Service: Provide set of exported session IDs for status badge rendering
 """
 
 from __future__ import annotations
@@ -33,8 +42,19 @@ from opencode_extractor.cache.load_export_cache import load_export_cache
 # Edge Cases:
 #   - Non-string keys in JSON (though standard JSON requires string keys): Handled cleanly by set conversion.
 #   - Duplicate session IDs cannot occur (a JSON object can only have one value per key).
+# Testing Steps:
+#   - Call `load_exported_session_ids()` in python shell. Verify return type is `set`.
 def load_exported_session_ids() -> Set[str]:
     # Load the full dictionary of cached export information.
+    # Variable Type: Dict[str, Dict[str, Any]]
+    # Options & Values: Dict of session metadata or empty dict `{}`
+    # Errors: Errors swallowed inside load_export_cache(), returning `{}`
     cache = load_export_cache()
+
     # Extract only the keys (session IDs) and convert them to a set structure for quick checking.
+    # Variable Type: Set[str]
+    # Options: Set containing session ID strings e.g. {"sess_1", "sess_2"} or empty set `set()`
+    # Output: Unique set of session ID strings
+    # Testing Step: `assert isinstance(load_exported_session_ids(), set)`
     return set(cache.keys())
+
