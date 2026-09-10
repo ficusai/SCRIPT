@@ -1,3 +1,8 @@
+# Module note: Deselect All Sessions Event Handler.
+# Purpose: Unchecks every visible session row checkbox in the main session table.
+# Plain-language overexplanation for beginners:
+# When the user clicks the "Deselect All" button above the session table, this handler loops through all visible rows in the table and unchecks their checkboxes, then updates the counter label and export button.
+
 from PyQt6.QtCore import Qt
 from gui.handlers.update_selected_sessions_count import update_selected_sessions_count
 
