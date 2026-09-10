@@ -1,3 +1,72 @@
+# [Schema Note: Export Cache File Format (exported_sessions.json)]
+# ==========================================
+# JSON file stored at ~/.local/share/opencode/exported_sessions.json
+#
+# ROOT STRUCTURE:
+# {
+#   "version": <int>,                          # Cache format version (currently always 1)
+#   "last_updated": "<ISO 8601>",             # Timestamp of most recent write (for humans/debugging)
+#   "exported_sessions": {                     # THE ACTUAL PAYLOAD (returned by this function)
+#     "<session_id>": {
+#       "exported_at": "<ISO 8601>",           # When this session was exported
+#       "output_path": "<filesystem_path>",    # Directory where export data was written
+#       "script_count": <int>,                 # Number of script files written
+#       "tool_call_count": <int>               # Number of tool call records in session
+#     },
+#     ...
+#   }
+# }
+#
+# FUNCTION RETURNS:
+#   Only the "exported_sessions" inner dict (version and last_updated are DROPPED).
+#   Return type: Dict[str, Dict[str, Any]]  (session_id -> metadata dict)
+#
+# FIELD DETAILS (per-session metadata dict):
+#   exported_at     str   ISO 8601 timestamp string (e.g. "2026-09-10T15:30:00.000000")
+#   output_path     str   Filesystem path to export directory (no validation performed)
+#   script_count    int   Number of script artifacts written during export
+#   tool_call_count int   Number of tool call records in this session
+#
+# FAILURE MODES (all degrade to {}):
+#   - File absent: returns {}
+#   - Corrupted JSON (invalid syntax): returns {}
+#   - Root JSON is not a dict (e.g. array, string, number): returns {}
+#   - Root dict missing "exported_sessions" key: returns {}
+#   - "exported_sessions" is a non-dict (list/None/string): returned as-is (dangerous)
+#   - Permission error reading file: returns {}
+#
+# CONCURRENCY:
+#   - No file locking; last writer wins on concurrent access
+#   - Read-modify-write pattern for updates
+#
+# COMPATIBILITY:
+#   - Backward compatible: adding new metadata keys is safe (callers use .get())
+#   - Forward incompatible: removing keys breaks callers that expect them
+#   - Version field written but never validated on read (reserved for future migrations)
+#
+# EXAMPLE CACHE FILE:
+#   {
+#     "version": 1,
+#     "last_updated": "2026-09-10T15:30:00.000000",
+#     "exported_sessions": {
+#       "sess_123": {
+#         "exported_at": "2026-09-10T15:30:00.000000",
+#         "output_path": "/tmp/exports/sess_123",
+#         "script_count": 3,
+#         "tool_call_count": 8
+#       },
+#       "sess_456": {
+#         "exported_at": "2026-09-10T16:00:00.000000",
+#         "output_path": "/tmp/exports/sess_456",
+#         "script_count": 1,
+#         "tool_call_count": 3
+#       }
+#     }
+#   }
+#
+# RETURN VALUE (from this function):
+#   {"sess_123": {"exported_at": "...", "output_path": "/tmp/exports/sess_123", ...}, ...}
+
 """
 Loads raw export cache dictionary from disk.
 

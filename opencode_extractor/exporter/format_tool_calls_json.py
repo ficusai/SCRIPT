@@ -1,3 +1,62 @@
+# [Schema Note: tool_calls.json Export Format]
+# ==========================================
+# JSON array of tool call objects, pretty-printed with 2-space indentation.
+#
+# OUTPUT STRUCTURE (array of objects):
+# [
+#   {
+#     "call_id": "<call_id>",               # str: tc.call_id (may be "" if no call ID in source)
+#     "tool": "<tool_name>",                 # str: tc.tool_name ("bash", "write", "edit", "read", etc.)
+#     "session_id": "<session_id>",          # str: tc.session_id
+#     "agent": "<session_agent>",            # str: tc.session_agent ("build", "explore", "coder")
+#     "title": "<session_title>",            # str: tc.session_title
+#     "is_subagent": <bool>,                 # bool: tc.is_subagent
+#     "status": "<status>",                  # str: tc.status ("completed", "error", "running", "pending" or "")
+#     "timestamp": "<ISO 8601>" | null,     # str|null: tc.time.isoformat() or null when time is None
+#     "input": <dict>,                       # dict: tc.input_params (may be {"raw": <value>} for non-dict inputs)
+#     "output": "<string>",                  # str: tc.output (raw text response from tool)
+#     "error": "<string>" | null             # str|null: tc.error or null when no error
+#   }
+# ]
+#
+# KEY ORDER (per element, Python 3.7+ insertion order):
+#   call_id -> tool -> session_id -> agent -> title -> is_subagent -> status ->
+#   timestamp -> input -> output -> error
+#
+# FIELD SEMANTICS:
+#   - call_id: "" (empty string) when source step had no call ID; serialized as "" not omitted
+#   - tool: tc.tool_name; no enum validation on write
+#   - status: may be "" when unknown; expected "completed", "error", "cancelled"
+#   - timestamp: ISO 8601 from datetime.isoformat(); null when tc.time is None
+#   - input: tc.input_params dict; may contain non-JSON-serializable types from SQLite
+#   - output: raw text; no truncation applied (unlike markdown formatter which truncates at 5000 chars)
+#   - error: null when no error occurred
+#
+# ORDERING:
+#   Elements in array follow bundle.tool_calls order (already time-sorted by extract_tool_calls)
+#
+# EMPTY CASE:
+#   Returns "[]" (valid JSON empty array) when bundle.tool_calls is empty
+#
+# SERIALIZATION:
+#   json.dumps(records, indent=2)
+#
+# EXAMPLE RECORD:
+#   {
+#     "call_id": "call_abc123",
+#     "tool": "bash",
+#     "session_id": "sess_01HJ89XYZ",
+#     "agent": "build",
+#     "title": "Fix Auth Bug",
+#     "is_subagent": false,
+#     "status": "completed",
+#     "timestamp": "2026-09-10T14:02:00.000000",
+#     "input": {"command": "pytest tests/"},
+#     "output": "2 passed in 0.05s",
+#     "error": null
+#   }
+
+
 """
 Formats tool call logs as a JSON string.
 

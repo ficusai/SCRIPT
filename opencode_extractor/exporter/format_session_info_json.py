@@ -1,3 +1,46 @@
+# [Schema Note: session_info.json Export Format]
+# ==========================================
+# Pretty-printed JSON with 2-space indentation. Human-readable and machine-parseable.
+#
+# OUTPUT STRUCTURE:
+# {
+#   "id": "<session_id>",                      # str: bundle.session.id
+#   "title": "<display_title>",                # str: bundle.session.display_title (fallback: "(untitled session)")
+#   "agent": "<agent>",                        # str: raw agent name; may be "" if NULL in source
+#   "model": "<model>",                        # str: raw model name; may be "" if NULL in source
+#   "directory": "<path>",                     # str: working directory path; may be "" if NULL
+#   "created": "<ISO 8601>" | null,           # str|null: bundle.session.time_created.isoformat() or null
+#   "subagent_count": <int>,                   # int: len(bundle.subagents)
+#   "subagents": [                             # List[Dict]: array of subagent metadata
+#     {
+#       "id": "<sub_session_id>",              # str
+#       "title": "<sub_display_title>",        # str: sub.title (NOT display_title — raw title)
+#       "agent": "<agent>",                    # str
+#       "model": "<model>",                    # str
+#       "created": "<ISO 8601>" | null         # str|null: sub.time_created.isoformat() or null
+#     }
+#   ],
+#   "total_script_files": <int>,               # int: len(bundle.scripts)
+#   "total_tool_calls": <int>                  # int: len(bundle.tool_calls)
+# }
+#
+# KEY ORDER (Python 3.7+ dict insertion order preserved):
+#   id -> title -> agent -> model -> directory -> created -> subagent_count -> subagents ->
+#   total_script_files -> total_tool_calls
+#
+# TIMESTAMP FORMAT:
+#   ISO 8601 string from datetime.isoformat(): "2026-09-10T14:00:00.000000"
+#   null when time_created is None
+#
+# NOTE: time_updated is DELIBERATELY NOT serialized. Only "created" appears.
+# NOTE: subagent "title" uses raw .title, NOT .display_title (unlike root session).
+# NOTE: subagent list does NOT include parent_id or subagent_count fields.
+#
+# SERIALIZATION:
+#   json.dumps(meta, indent=2)
+#   Output is a string, never raises for normal inputs (all values are str/int/None/list-of-dict)
+
+
 """
 Formats session metadata and subagent details as a JSON string.
 

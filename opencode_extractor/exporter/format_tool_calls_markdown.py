@@ -1,3 +1,75 @@
+# [Schema Note: tool_calls_transcript.md Output Format]
+# ==========================================
+# CommonMark / GitHub Flavored Markdown document. Complete standalone file.
+#
+# DOCUMENT STRUCTURE:
+#
+# === HEADER SECTION ===
+# # Session Transcript & Tool Call Log
+#
+# - **Title:** <display_title>                    # blank -> "(untitled session)"
+# - **Session ID:** `<id>`                         # backtick-wrapped
+# - **Agent:** <agent or "build">                  # fallback "build" if empty
+# - **Model:** <model or "N/A">                    # fallback "N/A" if empty
+# - **Directory:** `<directory>`                   # backtick-wrapped
+# - **Created:** <YYYY-MM-DD HH:MM:SS or "N/A">   # strftime('%Y-%m-%d %H:%M:%S') or "N/A"
+# - **Subagent Count:** <int>
+# - **Extracted Tool Calls:** <int>
+# - **Extracted Script Files:** <int>
+#
+# ---
+#
+# === TOOL CALLS SECTION ===
+# ## Tool Calls Log
+#
+# [If empty tool_calls:]
+# *No tool calls recorded in this session wave.*
+#
+# [For each tool call, 1-indexed:]
+# ### <idx>. `<tool_name>` (<status or "executed">) — <YYYY-MM-DD HH:MM:SS or "N/A"> [<origin>]
+#
+# [If call_id non-empty:]
+# *Call ID:* `<call_id>`
+#
+# **Input Parameters:**
+# ```json
+# <json.dumps(input_params, indent=2)>
+# ```
+# [Fallback if json.dumps fails: str(tc.input_params)]
+#
+# [If output non-empty:]
+# **Output / Result:**
+# ```
+# <output.strip()[:5000]>
+# ... (output truncated)    # only if len > 5000
+# ```
+#
+# [If error non-empty:]
+# **Error:**
+# ```
+# <error>
+# ```
+#
+# ---
+#
+# TRUNCATION RULES:
+#   - Tool output > 5000 chars: truncated to first 5000 + "\n... (output truncated)"
+#   - Empty output: Output / Result section completely omitted
+#   - Empty error: Error section completely omitted
+#
+# MARKDOWN INJECTION CAVEAT:
+#   tool_name, status, and titles are interpolated WITHOUT escaping.
+#   Exotic backticks or pipes in those fields can break rendering cosmetics.
+#
+# JOIN CHARACTER:
+#   Lines joined with "\n" (no trailing newline at end of document)
+#
+# CODE FENCE LANGUAGES:
+#   - Input Parameters: ```json (enables JSON syntax highlighting)
+#   - Output / Result: ``` (plain, no language specifier)
+#   - Error: ``` (plain, no language specifier)
+
+
 """
 Formats session transcript and tool call logs as Markdown.
 

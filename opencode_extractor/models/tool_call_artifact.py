@@ -15,6 +15,69 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 
+# [Schema Note: ToolCallArtifact Data Model]
+# ==========================================
+# Represents a single tool invocation step within an OpenCode session.
+#
+# FIELD SCHEMA:
+#   call_id         str          Required. Unique tool invocation identifier (e.g. "call_abc123").
+#                                Format is opaque; typically "call_<uuid>" from OpenCode session logs.
+#                                No uniqueness enforcement across multiple database sources.
+#   tool_name       str          Required. Invoked tool name (e.g. "write", "edit", "bash", "read",
+#                                "glob", "grep", "task", "mcp__<server>__<tool>").
+#                                No validation against a known set; any string accepted.
+#   session_id      str          Required. AI session ID string where tool call occurred.
+#   session_agent   str          Required. Agent name ("build", "explore", "coder").
+#   session_title   str          Required. Human-readable session title.
+#   is_subagent     bool         Required. True if invoked within child subagent session.
+#   status          str          Required. Execution status: "completed" | "error" | "running" | "pending".
+#                                Other strings accepted without validation.
+#   time            Optional[datetime] Required. Tool call start timestamp or None.
+#                                From parse_ts(); None if column is NULL or 0.
+#   input_params    dict         Optional. Default {}. Dictionary of input parameters passed to tool.
+#                                May contain non-JSON-serializable types (e.g., Path objects) from SQLite.
+#                                Keys/values: arbitrary (dict of str -> any JSON-serializable type).
+#   output          str          Optional. Default "". Output text or pretty-printed JSON from tool.
+#                                May contain binary data if SQLite stores TEXT with invalid UTF-8.
+#                                No truncation applied; outputs >1MB not limited.
+#   error           Optional[str] Optional. Default None. Error text if tool execution failed.
+#   db_source_path  str          Optional. Default "". Absolute path to source database/dump file.
+#
+# input_params EXAMPLES:
+#   write tool:   {"filePath": "src/main.py", "content": "def foo(): pass"}
+#   edit tool:    {"filePath": "src/main.py", "old_string": "def foo()", "new_string": "def bar()"}
+#   bash tool:    {"command": "pytest tests/", "timeout": 30}
+#   read tool:    {"filePath": "src/main.py"}
+#   glob tool:    {"pattern": "**/*.py"}
+#   grep tool:    {"pattern": "TODO", "path": "src/"}
+#   mcp tool:     {"server": "filesystem", "tool": "read_file", "path": "/etc/hosts"}
+#
+# PROPERTY NOTES:
+#   None defined (plain dataclass with no computed properties)
+#
+# EXAMPLE INSTANTIATION:
+#   tc = ToolCallArtifact(
+#       call_id="call_abc123",
+#       tool_name="bash",
+#       session_id="sess_01HJ89XYZ",
+#       session_agent="build",
+#       session_title="Fix Auth Bug",
+#       is_subagent=False,
+#       status="completed",
+#       time=datetime(2026, 9, 10, 14, 2, 0),
+#       input_params={"command": "pytest tests/", "timeout": 30},
+#       output="2 passed in 0.05s",
+#       error=None,
+#   )
+#
+# CONSTRAINTS:
+#   - call_id uniqueness NOT guaranteed across sources; deduplication happens at query time
+#   - tool_name has no enum validation; valid values inferred from usage patterns
+#   - input_params may contain non-JSON-serializable types; json.dumps() may fail
+#   - output and error fields may contain binary data from SQLite TEXT columns with invalid UTF-8
+#   - is_subagent is set during load and never modified after creation
+
+
 # Class Purpose & Overview:
 # Data container recording an individual action invoked by an AI tool (such as file reads, writes, edits, bash commands, glob searches, or grep queries), storing input arguments, output text, error messages, and execution metadata.
 #

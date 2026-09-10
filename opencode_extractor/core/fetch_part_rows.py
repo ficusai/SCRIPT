@@ -1,3 +1,47 @@
+# [Schema Note: SQLite part Table Schema]
+# ==========================================
+# The source SQLite database contains a 'part' table with the following schema:
+#
+# CREATE TABLE part (
+#     id           INTEGER PRIMARY KEY AUTOINCREMENT,
+#     session_id   TEXT NOT NULL,      -- references session.id (FK)
+#     message_id   TEXT,               -- unique message identifier within session
+#     type         TEXT,               -- "tool" | "result" | "human" | etc.
+#     tool         TEXT,               -- tool name (e.g. "bash", "write", "edit")
+#     data         TEXT,               -- JSON string of the step payload
+#     timestamp    REAL,               -- seconds-since-epoch (nullable)
+#     status       TEXT                -- "completed" | "error" | etc.
+# );
+#
+# QUERY (used by this function):
+#   SELECT session_id, data FROM part WHERE session_id IN (?, ?, ...)
+#   - Batching: session_ids split into chunks of 200 (SQLite variable limit safety)
+#   - Parameterized: values passed as bound params (?), never string-interpolated
+#   - No ORDER BY: rows returned in SQLite rowid (insertion) order
+#   - No LIMIT: all matching rows returned
+#
+# RETURN TYPE: Generator yielding (session_id: str, data: str) tuples
+#   - session_id: the owning session ID from the part row
+#   - data: raw JSON string payload (may be None if column is NULL)
+#
+# TEXT DUMP ALTERNATIVE PATH:
+#   When src.kind == "text_dump", yields from pre-parsed text_parts dict:
+#     For each (message_id, obj) in text_parts[sid]:
+#       yield (sid, json.dumps(obj))
+#   - Re-serializes dict to JSON string to match SQLite row shape
+#   - Output shape matches: (session_id_str, json_data_str) tuples
+#
+# EDGE CASES:
+#   - NULL data column: yields (sid, None); downstream json.loads(None) raises TypeError -> dropped
+#   - Session in both SQLite and text dump: rows yielded twice (once per source)
+#   - Empty session_ids: zero SQL queries, clean exit with no output
+#   - Corrupt DB / missing 'part' table: source skipped via except Exception: continue
+#
+# BATCH SIZE:
+#   Chunk size = 200 (conservative; SQLite default SQLITE_MAX_VARIABLE_NUMBER = 999)
+#   Can be increased to 500-900 for performance on systems with ample resources
+
+
 """
 Queries raw message step rows from SQLite databases and text dumps.
 

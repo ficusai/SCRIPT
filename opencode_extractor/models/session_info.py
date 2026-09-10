@@ -15,6 +15,61 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+# [Schema Note: SessionInfo Data Model]
+# ==========================================
+# Represents a single OpenCode conversation session. Maps to the SQLite 'session' table row.
+#
+# FIELD SCHEMA:
+#   id              str          Required. Unique session identifier (e.g. "sess_98765fedcba").
+#                                No format validation; may contain any characters including "|".
+#                                First-wins deduplication across multi-source loads.
+#   title           str          Required. Human-readable session title. NULL -> "" in source.
+#   agent           str          Required. Agent persona name ("build", "explore", "coder"). NULL -> "".
+#   model           str          Required. LLM model name ("claude-3-5-sonnet", "gpt-4o"). NULL -> "".
+#   directory       str          Required. Project working directory path. NULL -> "".
+#   parent_id       Optional[str] Required. Parent session ID if subagent, None for root sessions.
+#                                NULL or "" in DB -> None (root). Coerced via `or None`.
+#   time_created    Optional[datetime] Required. Creation timestamp (seconds-since-epoch -> datetime).
+#                                NULL or 0 in DB -> None. Formatted via parse_ts().
+#   time_updated    Optional[datetime] Required. Last update timestamp. Same coercion as time_created.
+#   db_source_path  str          Optional. Default "". Absolute path to source SQLite DB or text dump file.
+#   subagent_count  int          Optional. Default 0. Count of direct child subagent sessions.
+#                                Computed post-load; not present in source data.
+#
+# ISO 8601 is NOT stored in DB; timestamps are REAL/INT seconds-since-epoch in SQLite.
+# Conversion to datetime happens at load time (parse_ts). Export serializes via isoformat().
+#
+# PROPERTY NOTES:
+#   is_subagent  -> bool : True if parent_id is truthy (non-None, non-empty).
+#   display_title -> str : title.strip() or id.strip() or "(untitled session)"
+#
+# SQLITE MAPPING (session table):
+#   SELECT id, title, agent, model, directory, parent_id, time_created, time_updated FROM session
+#
+# TEXT DUMP DEFAULTS (when no SQLite source):
+#   agent="build", model="opencode-dump", directory="", parent_id=None, timestamps=None
+#
+# EXAMPLE INSTANTIATION:
+#   s = SessionInfo(
+#       id="sess_01HJ89XYZ",
+#       title="Fix authentication bug",
+#       agent="build",
+#       model="claude-3-5-sonnet",
+#       directory="/home/user/project",
+#       parent_id=None,
+#       time_created=datetime(2026, 9, 10, 14, 0, 0),
+#       time_updated=datetime(2026, 9, 10, 14, 5, 30),
+#   )
+#   assert s.is_subagent == False
+#   assert s.display_title == "Fix authentication bug"
+#
+# CONSTRAINTS:
+#   - No uniqueness guarantee on id field across sources
+#   - parent_id may reference non-existent sessions (silent orphan)
+#   - subagent_count only counts direct children, not transitive descendants
+#   - db_source_path may be "" before source path is resolved (text dump mode)
+
+
 # Class Purpose & Overview:
 # Data container holding metadata about an individual AI conversation session (such as session ID, title, agent name, LLM model name, working directory, and timestamps).
 #

@@ -1,3 +1,52 @@
+# [Schema Note: Text Dump File Format]
+# ==========================================
+# Plain text file with pipe-delimited fields. One JSON payload per line.
+#
+# LINE FORMAT:
+#   <session_id>|<message_id>|<json_payload>
+#
+# Examples:
+#   sess_01|msg_01|{"type":"tool","tool":"task","state":{"input":{"description":"Fix auth bug"}}}
+#   sess_01|msg_02|{"type":"tool","tool":"bash","state":{"input":{"command":"pytest tests/"}}}
+#   sess_01|msg_03|{"type":"result","tool":"bash","output":"2 passed in 0.05s"}
+#
+# PARSING RULES:
+#   - maxsplit=2: splits into exactly 3 parts; pipes inside JSON payload are preserved
+#   - Blank lines and lines without "|" are silently skipped
+#   - Malformed JSON payloads are skipped per-line (JSONDecodeError caught)
+#   - Non-dict JSON (arrays, strings, numbers) stored in text_parts but cannot infer title
+#
+# SESSION METADATA INFERRED FROM FIRST SEEN PAYLOAD:
+#   If obj is a dict AND obj["type"] == "tool" AND obj["tool"] == "task":
+#     title = obj["state"]["input"]["description"]
+#   Otherwise:
+#     title = f"Dump Session (<session_id[:10]>)"
+#
+# DEFAULT VALUES (text dump sessions lack rich SQLite metadata):
+#   agent       = "build"
+#   model       = "opencode-dump"  (sentinel indicating dump origin, not a real LLM)
+#   directory   = ""
+#   parent_id   = None
+#   time_created = None
+#   time_updated = None
+#
+# FILE ENCODING:
+#   UTF-8 with errors="replace" (invalid bytes become U+FFFD replacement character)
+#
+# MUTATION BEHAVIOR:
+#   - sessions dict: mutated in-place; existing entries preserved, new entries added
+#   - text_parts dict: mutated in-place; (message_id, parsed_dict) tuples appended per session
+#
+# CONSTRAINTS:
+#   - Pipe character "|" inside session_id or message_id breaks parsing (not supported)
+#   - If session already loaded from SQLite, metadata is NOT overwritten; parts are appended only
+#   - No timestamp parsing; all text dump sessions have None timestamps
+#
+# TEXT DUMP PATHS (from constants/text_dump_paths.py):
+#   - Primary: ~/.local/share/opencode/imported_sessions/opencode_parts.txt
+#   - Backup glob: /run/media/*/*/Unified_Backup*/*/opencode_parts.txt
+
+
 """
 Parses sessions from text dump files like opencode_parts.txt.
 
