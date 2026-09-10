@@ -1,3 +1,9 @@
+# Module note: MainWindow Class Definition Module.
+# Purpose: Primary QMainWindow container managing application state, UI subcomponents, database filters, and asynchronous workers.
+# Plain-language overexplanation for beginners:
+# This file defines the main application window class.
+# It sets window dimensions (1200x780 pixels), applies the dark theme stylesheet, holds global application state variables, assembles the header, table, preview pane, export settings bar, and status footer, and launches initial database scanning.
+
 # Line note: Import python type hint helpers for lists and optional values.
 from typing import List, Optional
 # Line note: Import core Qt constants such as alignment and orientation flags.
