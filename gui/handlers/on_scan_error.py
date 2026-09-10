@@ -1,3 +1,8 @@
+# Module note: Database Scan Error Handler Callback.
+# Purpose: Handles failures during database scanning background operations.
+# Plain-language overexplanation for beginners:
+# If scanning database files fails, this callback restores control buttons, updates the status message, and pops up a critical error dialog.
+
 from PyQt6.QtWidgets import QMessageBox
 
 
