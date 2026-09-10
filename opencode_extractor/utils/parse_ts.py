@@ -41,28 +41,22 @@ from typing import Optional
 #   - Run: python3 -c 'from opencode_extractor.utils.parse_ts import parse_ts; print(parse_ts(1700000000000))' (outputs local datetime for 2023-11-14)
 #   - Run: python3 -c 'from opencode_extractor.utils.parse_ts import parse_ts; print(parse_ts(None))' (outputs None)
 
-# Function declaration: Takes optional integer timestamp in ms or sec, returns optional local datetime object
-def parse_ts(ms: Optional[int]) -> Optional[_dt.datetime]:
-    # Line explanation: Checks if input 'ms' is None, zero, or falsy.
-    # Output / Early Return: Returns None immediately for missing or zero timestamps.
-    if not ms:
-        # Line explanation: Early return statement yielding None.
+# Function declaration: Takes optional timestamp (ms/sec/str), returns optional local datetime object
+def parse_ts(ms: Optional[int | float | str]) -> Optional[_dt.datetime]:
+    # Line explanation: Checks if input 'ms' is None, empty string, or zero.
+    # Output / Early Return: Returns None immediately for missing or falsy timestamps.
+    if ms is None or ms == "" or ms == 0:
         return None
-        
-    # Line explanation: First attempt try-block converting input from milliseconds to seconds.
     try:
-        # Line explanation: Converts 'ms' to int, divides by 1000 to convert milliseconds to seconds, and creates local datetime object.
-        # Options: Works for millisecond timestamps like 1700000000000.
-        # Output: Returns local datetime object on success.
-        return _dt.datetime.fromtimestamp(int(ms) / 1000)
-    # Line explanation: Catches range overflow, OS environment, or value errors raised if the millisecond division fails.
-    except (OverflowError, OSError, ValueError):
-        # Line explanation: Second attempt try-block treating 'ms' directly as seconds.
-        try:
-            # Line explanation: Tries converting 'ms' directly as seconds without division.
-            # Output: Returns local datetime object if direct seconds interpretation succeeds.
-            return _dt.datetime.fromtimestamp(int(ms))
-        # Line explanation: Catches any remaining exceptions if direct seconds interpretation also fails.
-        except Exception:
-            # Line explanation: Final fallback return statement yielding None safely.
+        # Line explanation: Convert input to float for uniform numeric handling.
+        val = float(ms)
+        # Line explanation: Reject negative timestamps as invalid.
+        if val <= 0:
             return None
+        # Line explanation: Threshold-based detection: values > 1e11 are milliseconds (would be year > 5138 in seconds),
+        #                  values <= 1e11 are already in seconds.
+        # This fixes the bug where second-based timestamps like 1700000000 were incorrectly divided by 1000.
+        sec = val / 1000.0 if val > 1e11 else val
+        return _dt.datetime.fromtimestamp(sec)
+    except (OverflowError, OSError, ValueError, TypeError):
+        return None
