@@ -28,13 +28,22 @@ from opencode_extractor.models.tool_call_artifact import ToolCallArtifact
 #   - session: SessionInfo (Required) SessionInfo object for the main root session.
 #   - subagents: List[SessionInfo] (Optional, default=[]) List of child subagent SessionInfo objects.
 #   - scripts: List[ScriptArtifact] (Optional, default=[]) List of extracted ScriptArtifact objects.
-#   - tool_calls: List[ToolCallArtifact] (Optional, default=[]) List of extracted ToolCallArtifact objects.
-#
-# Usage & Export Options:
-#   - Exporter formats scripts into code files on disk and tool_calls into JSON and transcript Markdown documents.
-#
-# How to Test:
-#   - Run: python3 -c 'from opencode_extractor.models.session_info import SessionInfo; from opencode_extractor.models.session_export_bundle import SessionExportBundle; s = SessionInfo("id", "title", "agent", "model", "dir", None, None, None); b = SessionExportBundle(session=s); print(len(b.scripts), len(b.tool_calls))' (outputs 0 0)
+    #   - tool_calls: List[ToolCallArtifact] (Optional, default=[]) List of extracted ToolCallArtifact objects.
+    #
+    # Data Constraints & Edge Cases:
+    #   - No deduplication of scripts or tool_calls within a bundle; duplicates from multi-source loads persist
+    #   - The session object is the root; subagents list contains child SessionInfo objects
+    #   - scripts and tool_calls are independent lists; no referential integrity enforced between them
+    #   - Export order: scripts written first, then tool_calls as JSON/transcript; bundle is immutable after creation
+    #   - Memory: large bundles (1000+ scripts, 10000+ tool calls) may consume significant RAM during export
+    #   - Circular references: subagent parent_id references root session.id, but bundle does not track reverse refs
+    # (Data Note: Session export bundle grouping root session, subagents, scripts, and tool calls.
+    #  The bundle is a flat aggregation; no graph traversal is performed. Scripts from different sessions
+    #  may share the same filePath (intentional — reflects actual file overwrites in the source session).
+    #  Tool call timestamps may be None for text dump sources; sort by time requires filtering None values.)
+    #
+    # How to Test:
+    #   - Run: python3 -c 'from opencode_extractor.models.session_info import SessionInfo; from opencode_extractor.models.session_export_bundle import SessionExportBundle; s = SessionInfo("id", "title", "agent", "model", "dir", None, None, None); b = SessionExportBundle(session=s); print(len(b.scripts), len(b.tool_calls))' (outputs 0 0)
 
 # Dataclass decorator generating constructor __init__ and list defaults automatically
 @dataclass
