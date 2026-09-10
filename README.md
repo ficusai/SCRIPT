@@ -146,13 +146,52 @@ Scripts are identified by file extension. Supported extensions include Python (`
 - **OS**: Linux (GUI); CLI works on any OS with Python
 - **Display**: X11 or Wayland (for GUI mode)
 
-## Repository
+## Repository Stats
 
-- **Local path**: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`
-- **Remote**: https://github.com/ficusai/SCRIPT
-- **Branch**: `main`
-- **Commit count**: ~154
+| Detail | Value |
+|--------|-------|
+| **Branch** | `main-native-LINUX-1.0.0v` |
+| **Commits** | ~154 |
+| **Visibility** | Public |
+| **Created** | 2026 |
+| **Remote** | https://github.com/ficusai/SCRIPT |
 
 ## License
 
 Private repository. All rights reserved.
+
+## Tech Stack
+
+- **Python**: 3.11+ — primary language (~98.2% of codebase)
+- **PyQt6**: 6.4+ — desktop GUI framework
+- **SQLite** — database parsing and session storage
+- **Linux-focused** — GUI requires X11/Wayland; CLI works cross-platform
+
+## Architecture
+
+**Three-Layer Design:**
+1. **Core Library** — SQLite parsing, session loading, extraction pipeline
+2. **GUI** — PyQt6 dark-themed desktop app (1200x780, Catppuccin Mocha)
+3. **CLI** — Command-line interface for batch processing
+
+**Key Modules:**
+- `extract_scripts.py` — Code artifact extraction
+- `parse_bash_artifacts.py` — Pattern matching for bash constructs
+- `export/` — JSON, Markdown, ZIP formatters
+- `discovery/` — Filesystem scanning for databases
+- `cache/` — Track exported sessions to avoid duplicates
+
+## Primary Use Cases
+
+1. **Extract AI Coding Sessions** — Pull structured data (scripts, tool calls, transcripts) from OpenCode AI assistant databases for archiving, analysis, or reuse
+2. **Desktop GUI + CLI Flexibility** — PySide6 interface for browsing without command-line expertise; CLI for automation and batch processing
+3. **Multiple Export Formats** — JSON, Markdown, or ZIP archives with full transcripts and session metadata
+4. **Comprehensive Artifact Collection** — Scripts, tool call logs, subagent hierarchies, and patches bundled together
+5. **Fast Session Discovery** — Automatic SQLite database detection with caching layer for rapid repeated queries
+
+## Who Should Use This
+
+- **Researchers & Analysts** — Study AI coding assistant behavior and patterns
+- **Developers** — Archive and version-control AI-assisted code generation
+- **DevOps/SRE Teams** — Extract runnable scripts from coding sessions for deployment
+- **Organizations Using OpenCode** — Centralize and audit AI coding activity
