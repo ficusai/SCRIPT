@@ -1,5 +1,14 @@
 """
 Recursively collects subagent sessions descended from root_id.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Evaluates session graph relationships across all database sources
+- Formats Handled: List[SessionInfo] containing subagent metadata hierarchy
+- Export Modes Supported: Graph traversal depth-first subagent hierarchy collector
+- Framework Possibilities:
+    - CLI: Subagent discoverer for session tree export bundles
+    - Tree Visualizer: Generates parent-child session hierarchy trees for UI rendering
+    - Multi-Agent Orchestrator: Dependency graph analyzer for agent workflows
 """
 
 from __future__ import annotations
@@ -35,20 +44,36 @@ from opencode_extractor.models.session_info import SessionInfo
 #   - Root session has no child subagents: Returns empty list `[]`.
 #   - root_id does not exist in `sessions` dict: Returns empty list `[]`.
 #   - Deeply nested chains (1000+ levels): immune to Python recursion limits thanks to the explicit stack.
+# Testing Steps:
+#   - Call `find_descendants(sessions_dict, "root_id")`
+#   - Verify returned list contains only child `SessionInfo` objects where `parent_id` matches parent hierarchy
 def find_descendants(sessions: Dict[str, SessionInfo], root_id: str) -> List[SessionInfo]:
+    # Initialize output list for descendant SessionInfo objects
+    # Variable Type: List[SessionInfo]
     out: List[SessionInfo] = []
+
     # Initialize traversal stack starting with the root session ID.
+    # Variable Type: List[str]
     stack = [root_id]
+
     # Set to record visited session IDs so we do not fall into infinite loops.
+    # Variable Type: Set[str]
     seen: Set[str] = set()
+
+    # Continue graph traversal while stack has unvisited session IDs
     while stack:
         pid = stack.pop()
         if pid in seen:
             continue
         seen.add(pid)
+
         # Search all session records for any session whose parent ID matches the current ID.
         for sess in sessions.values():
             if sess.parent_id == pid and sess.id not in seen:
                 out.append(sess)
                 stack.append(sess.id)
+
+    # Return list of discovered descendant sessions
+    # Output: List[SessionInfo]
     return out
+
