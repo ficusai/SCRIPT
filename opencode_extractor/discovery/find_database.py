@@ -1,5 +1,14 @@
 """
 Returns the primary local SQLite database path.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .db (Primary SQLite database path target), .sqlite, .txt
+- Formats Handled: String representing path to primary database on local disk
+- Export Modes Supported: Single primary database auto-selection mode
+- Framework Possibilities:
+    - CLI: Default database path provider when user executes extraction without specifying `--db`
+    - REST API: Initialize database connection automatically using default system path
+    - GUI: Auto-select primary database on application startup
 """
 
 from __future__ import annotations
@@ -29,8 +38,18 @@ from opencode_extractor.discovery.discover_all_databases import discover_all_dat
 #   - No databases found: Returns `None`
 # Edge Cases:
 #   - System has no opencode databases installed or accessible: Returns `None` without raising an exception.
+# Testing Steps:
+#   - Run `from opencode_extractor.discovery.find_database import find_database; print(find_database())`
 def find_database() -> Optional[str]:
     # Run database discovery to get a list of all available database sources.
+    # Variable Type: List[DatabaseSource]
+    # Default: sorted list of discovered sources or empty list `[]`
     dbs = discover_all_databases()
+
     # Return the file path of the top database entry if any exist, otherwise return None.
+    # Ternary Expression: `dbs[0].path if dbs else None`
+    # Return Type: Optional[str] (str path or None)
+    # Output: Highest priority database path string or None
+    # Testing Step: Assert return value is either a valid file string path or None
     return dbs[0].path if dbs else None
+
