@@ -1,5 +1,14 @@
 """
 Loads raw export cache dictionary from disk.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (JSON database for cache tracking)
+- Formats Handled: JSON UTF-8 encoded text with root object keys
+- Export Modes Supported: Read-only cache state retrieval for session metadata
+- Framework Possibilities:
+    - CLI: Inspect active export cache state and report statistics to terminal
+    - Web API: Expose export history as JSON endpoint in monitoring dashboard
+    - Microservices: Share cache state between file parser and UI frontend
 """
 
 from __future__ import annotations
@@ -57,19 +66,39 @@ from opencode_extractor.cache.ensure_cache_dir import CACHE_FILE, ensure_cache_d
 # Testing Values & Edge Cases:
 #   - Valid return: Dict[str, Dict[str, Any]] mapping session_id to metadata dict.
 #   - Corrupted JSON text, non-dict root, missing key, permission errors: all return `{}` without crashing.
+# Testing Steps:
+#   - Call `load_export_cache()` in python shell. Verify return type is `dict`.
 def load_export_cache() -> Dict[str, Dict[str, Any]]:
     # Make sure the cache directory is present on disk.
+    # Side Effect: Creates directory structure ~/.local/share/opencode if missing
+    # Failure: PermissionError if folder cannot be created
     ensure_cache_dir()
+
     # If the cache file does not exist yet, return an empty dictionary.
+    # Condition: CACHE_FILE.exists() returns False when exported_sessions.json is missing on disk
+    # Return: {} (empty dictionary)
+    # Testing Step: Delete CACHE_FILE and verify function returns {}
     if not CACHE_FILE.exists():
         return {}
+
     try:
         # Read the contents of the cache JSON file and convert it into a Python dictionary.
+        # Variable Type: dict / list / Primitive JSON types from json.loads
+        # Encodings Supported: utf-8
+        # Failure Modes: json.JSONDecodeError if JSON syntax is corrupt, FileNotFoundError if deleted between check and read
         data = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+
         # Verify that the parsed data is a dictionary containing the 'exported_sessions' key.
+        # Options & Validation: Type check `isinstance(data, dict)` and key presence `"exported_sessions" in data`
+        # Output: Returns dictionary mapping string session IDs to metadata dictionaries
         if isinstance(data, dict) and "exported_sessions" in data:
             return data["exported_sessions"]
     except Exception:
         # If reading or parsing fails for any reason, safely ignore errors and return an empty dictionary.
+        # Catch All: Broad Exception handler prevents application crash on corrupted file read
         pass
+
+    # Return fallback empty dictionary if parsing fails or invalid format detected
+    # Output: {}
     return {}
+
