@@ -1,42 +1,190 @@
-# Byte-compiled / optimized / DLL files
+# File Purpose & Overview:
+# What is `.gitignore`?
+# This configuration file tells the Git version control software which files and folders on disk should be IGNORED
+# (never tracked, saved, or uploaded to code repositories).
+#
+# Why do we ignore files?
+# When Python runs code or when tools build software, they generate temporary files (like cache files, build output, or local environment settings).
+# Storing generated files in Git causes bloat, merge conflicts, and accidental leak of sensitive private data or local machine settings.
+#
+# Syntax Guide for `.gitignore` patterns:
+# - `folder/` : Ignores any directory named `folder/` and all files inside it.
+# - `*.ext`   : Wildcard matching; ignores all files ending with `.ext` in any directory.
+# - `*`       : Matches zero or more characters (except slashes).
+# - `?`       : Matches any single character.
+# - `[abc]`   : Character class matching; matches any single character inside the brackets (e.g. `*.py[cod]` matches `.pyc`, `.pyo`, `.pyd`).
+# - `!file`   : Negation rule; explicitly UN-ignores a file that would otherwise be excluded.
+# - `/file`   : Leading slash anchors pattern to root directory of repository.
+# - `#`       : Comment line ignored by Git.
+#
+# Commands to test and debug `.gitignore` patterns:
+# - Check why a file is ignored: `git check-ignore -v path/to/file.pyc`
+# - Check status of ignored files: `git status --ignored`
+# - Remove previously tracked file from Git index without deleting local disk file: `git rm --cached path/to/file`
+
+# Section 1: Python Byte-Compiled, Optimized, and Dynamic Link Library Files
+# When Python runs a file like `gui/app.py`, it automatically translates human-readable source code into binary bytecode stored in `.pyc` files
+# inside `__pycache__` folders. This speeds up future startup times but byte-code files are machine-generated and must NOT be committed to Git.
+
+# Line 2 explanation: `__pycache__/`
+# - What it does: Ignores all `__pycache__` folders and all bytecode files inside them anywhere in the repository.
+# - Option variations: `**/__pycache__/` (explicit recursive wildcard), `/__pycache__/` (root folder only).
+# - Default value: `__pycache__/` matches all folders named `__pycache__` at any depth.
+# - Output / Effect: Prevents python compile cache files from clogging `git status`.
+# - Edge case: If a `__pycache__` folder was accidentally committed previously, `.gitignore` will not untrack it automatically until `git rm -r --cached __pycache__` is executed.
+# - How to test: Run `python3 -m compileall .` then run `git status` to verify `__pycache__` does not show up.
 __pycache__/
+
+# Line 3 explanation: `*.py[cod]`
+# - What it does: Matches and ignores any file ending in `.pyc` (compiled bytecode), `.pyo` (optimized bytecode), or `.pyd` (Python dynamic DLL on Windows).
+# - Pattern syntax breakdown: `[cod]` is a character set matching `c`, `o`, or `d`.
+# - Option variations: `*.pyc`, `*.pyo`, `*.pyd` (written as three separate lines).
+# - Default value: `*.py[cod]`
+# - Output / Effect: Excludes compiled bytecode binaries from git tracking.
+# - Edge case: Renaming a file to `.py` restores normal Git tracking.
+# - How to test: Run `touch test_sample.pyc` and run `git check-ignore -v test_sample.pyc`.
 *.py[cod]
+
+# Line 4 explanation: `*$py.class`
+# - What it does: Ignores Java byte-code class files generated when Python code is compiled under Jython (Python implementation running on Java Virtual Machine).
+# - Default value: `*$py.class`
+# - Output / Effect: Keeps Jython binary artifact files out of version control.
+# - How to test: Run `git check-ignore -v example$py.class`.
 *$py.class
 
-# C extensions
+# Section 2: C Extensions and Compiled Shared Libraries
+# C extension binaries compiled for Python modules.
+
+# Line 7 explanation: `*.so`
+# - What it does: Ignores compiled Shared Object (`.so`) binary library files (Linux/Unix equivalent of Windows `.dll` files).
+# - Option variations: `*.dll` (Windows shared libraries), `*.dylib` (macOS shared libraries).
+# - Default value: `*.so`
+# - Output / Effect: Prevents architecture-specific C/C++ compiled binaries from being tracked in source code control.
+# - Edge case: If shipping pre-compiled native libraries inside the repo, un-ignore with `!lib/native.so`.
+# - How to test: Run `git check-ignore -v sample.so`.
 *.so
 
-# Distribution / packaging
+# Section 3: Distribution, Packaging, and Build Output Artifacts
+# Folders created by setuptools, wheel, pip, and build tools when packaging Python libraries for distribution on PyPI.
+
+# Line 10 explanation: `.Python`
+# - What it does: Ignores system symlink files named `.Python` created by older virtualenv environments.
 .Python
+
+# Line 11 explanation: `build/`
+# - What it does: Ignores the `build/` temporary compilation workspace directory created during `python setup.py build` or `pip install .`.
 build/
+
+# Line 12 explanation: `develop-eggs/`
+# - What it does: Ignores temporary development eggs folder created by zc.buildout tool.
 develop-eggs/
+
+# Line 13 explanation: `dist/`
+# - What it does: Ignores `dist/` folder containing finished distribution package archives (`.whl` wheel files and `.tar.gz` tarballs) ready for upload to PyPI.
 dist/
+
+# Line 14 explanation: `downloads/`
+# - What it does: Ignores temporary package download folders used by build automation scripts.
 downloads/
+
+# Line 15 explanation: `eggs/`
+# - What it does: Ignores zip-format Python binary package distribution folders created by setuptools.
 eggs/
+
+# Line 16 explanation: `.eggs/`
+# - What it does: Ignores hidden `.eggs/` directory containing downloaded build dependencies.
 .eggs/
+
+# Line 17 explanation: `lib/`
+# - What it does: Ignores local package library installation directory generated by build environments.
 lib/
+
+# Line 18 explanation: `lib64/`
+# - What it does: Ignores 64-bit architecture library installation directories.
 lib64/
+
+# Line 19 explanation: `parts/`
+# - What it does: Ignores workspace parts directories created by zc.buildout automation.
 parts/
+
+# Line 20 explanation: `sdist/`
+# - What it does: Ignores source distribution output directories created during packaging.
 sdist/
+
+# Line 21 explanation: `var/`
+# - What it does: Ignores variable data runtime directory created by build tools.
 var/
+
+# Line 22 explanation: `wheels/`
+# - What it does: Ignores directory containing pre-compiled wheel binary packages (`.whl`).
 wheels/
+
+# Line 23 explanation: `share/python-wheels/`
+# - What it does: Ignores system-installed Python wheel package directories.
 share/python-wheels/
+
+# Line 24 explanation: `*.egg-info/`
+# - What it does: Ignores setuptools package metadata directories (e.g. `opencode_extractor.egg-info/`) containing PKG-INFO and dependency indices.
 *.egg-info/
+
+# Line 25 explanation: `.installed.cfg`
+# - What it does: Ignores configuration state file generated by buildout environment installations.
 .installed.cfg
+
+# Line 26 explanation: `*.egg`
+# - What it does: Ignores single-file zip Python distribution egg binaries.
 *.egg
 
-# Virtual environments
+# Section 4: Virtual Environments
+# Isolated Python runtime environments containing installed package dependencies and Python binary binaries specific to a user's machine.
+
+# Line 29 explanation: `venv/`
+# - What it does: Ignores standard `venv` virtual environment folder created by `python3 -m venv venv`.
+# - Option variations: `venv/`, `.venv/`, `env/`, `.env/`.
+# - Output / Effect: Keeps gigabytes of installed dependencies out of version control.
+# - How to test: Run `git check-ignore -v venv/bin/python`.
 venv/
+
+# Line 30 explanation: `.venv/`
+# - What it does: Ignores hidden `.venv` virtual environment directory commonly used by VS Code, Poetry, and Pipenv.
 .venv/
+
+# Line 31 explanation: `env/`
+# - What it does: Ignores traditional `env` virtual environment directory.
 env/
+
+# Line 32 explanation: `.env/`
+# - What it does: Ignores hidden `.env` environment directory. Note: `.env` single files containing API secret environment variables are also ignored by this pattern in some versions of git.
 .env/
 
-# IDE & Editor files
+# Section 5: Integrated Development Environment (IDE) & Text Editor Project Settings
+# User-specific editor preferences, workspace states, and temporary swap files created by IDEs like VS Code, PyCharm, or Vim.
+
+# Line 35 explanation: `.vscode/`
+# - What it does: Ignores Visual Studio Code local workspace folder containing `settings.json`, `launch.json`, and debug configs.
+# - Edge case: If team wants to share `launch.json`, un-ignore with `!.vscode/launch.json`.
 .vscode/
+
+# Line 36 explanation: `.idea/`
+# - What it does: Ignores JetBrains IDE (PyCharm, IntelliJ, WebStorm) project configuration folder.
 .idea/
+
+# Line 37 explanation: `*.swp`
+# - What it does: Ignores Vim text editor temporary buffer swap files created while editing code.
 *.swp
+
+# Line 38 explanation: `*.swo`
+# - What it does: Ignores Vim secondary swap files created during multiple edit sessions.
 *.swo
 
-# OS metadata
+# Section 6: Operating System Generated Metadata Files
+# Hidden desktop metadata files generated automatically by macOS Finder and Windows Explorer.
+
+# Line 41 explanation: `.DS_Store`
+# - What it does: Ignores macOS Desktop Services Store hidden metadata file created automatically by Finder to store folder view settings and icon positions.
+# - How to test: Run `git check-ignore -v .DS_Store`.
 .DS_Store
+
+# Line 42 explanation: `Thumbs.db`
+# - What it does: Ignores Windows Explorer thumbnail database file generated automatically when viewing folders containing image files.
 Thumbs.db
