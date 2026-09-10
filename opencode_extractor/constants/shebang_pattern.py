@@ -55,7 +55,7 @@ import re
 #   - #!/bin/zsh-extra -> Word boundary after "zsh" prevents match of "zsh-extra"
 SHEBANG_PATTERN = re.compile(
     # Pattern string: Line-start #!, optional path, and whitelisted interpreter name with word boundaries
-    r"^#!.*\b(?:python|node|ruby|perl|php|bash|sh|zsh|lua|go run|deno|\w+-\w+)\b",
+    r"^#!.*\b(?:python[0-9.]*|node|ruby|perl|php|bash|sh|zsh|lua|go run|deno|\w+-\w+)\b",
     # Flag: MULTILINE (re.M)
     re.M,
 )
