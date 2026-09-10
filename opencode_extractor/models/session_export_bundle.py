@@ -2,80 +2,51 @@
 Groups a root session with all helper subagent sessions, script artifacts, and tool calls.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import dataclass and field utilities for data structure declaration
 from dataclasses import dataclass, field
+
+# Import List type hint for typed list attributes
 from typing import List
 
+# Import ScriptArtifact model representing extracted code scripts
 from opencode_extractor.models.script_artifact import ScriptArtifact
+
+# Import SessionInfo model representing conversation metadata
 from opencode_extractor.models.session_info import SessionInfo
+
+# Import ToolCallArtifact model representing tool execution logs
 from opencode_extractor.models.tool_call_artifact import ToolCallArtifact
 
 
-# A complete package bundle collecting a session's details, subagents, code script files, and tool call logs.
+# Class Purpose & Overview:
+# Container bundle collecting all data for an exported session wave: root session metadata (`session`), child helper subagent metadata (`subagents`), extracted code files (`scripts`), and tool call log records (`tool_calls`).
 #
-# ============================================================================
-# FIELD-BY-FIELD SPECIFICATION
-# ============================================================================
-#   Field       Python type          Required?  Default   Valid test values
-#   -----       -----------          --------   -------   ----------------
-#   session     SessionInfo          YES        (none)    the ROOT session's SessionInfo
-#   subagents   List[SessionInfo]    NO         []        [], [sub1, sub2]
-#   scripts     List[ScriptArtifact] NO         []        [], [art1], [art1, art2, ...]
-#   tool_calls  List[ToolCallArtifact] NO       []        [], [tc1], [tc1, tc2, ...]
+# Field Specification & Types:
+#   - session: SessionInfo (Required) SessionInfo object for the main root session.
+#   - subagents: List[SessionInfo] (Optional, default=[]) List of child subagent SessionInfo objects.
+#   - scripts: List[ScriptArtifact] (Optional, default=[]) List of extracted ScriptArtifact objects.
+#   - tool_calls: List[ToolCallArtifact] (Optional, default=[]) List of extracted ToolCallArtifact objects.
 #
-# ============================================================================
-# PIPELINE POPULATION (assembled in extract_session_bundle)
-# ============================================================================
-#   1. info   = extractor.get_session(root_session_id)      -> KeyError if session id unknown
-#   2. tree   = extractor.root_tree(root_session_id)
-#   3. subagents = [m for m in tree.members if m.id != root_session_id]
-#        (members normally = [root] + descendants, so subagents = all descendants, ordered by
-#         find_descendants; a session with no children -> subagents = [])
-#   4. scripts    = extractor.extract_scripts(root_session_id, include_errors=include_errors)
-#        (sorted by filePath.lower())
-#   5. tool_calls = extractor.extract_tool_calls(root_session_id)   (sorted by time ascending)
-#   The four are packed into SessionExportBundle and returned. The CLI then prints
-#   len(bundle.scripts) and len(bundle.tool_calls) and, given --out, hands the bundle - or a list of
-#   bundles from extract_multiple_bundles - to export_session_bundles.
+# Usage & Export Options:
+#   - Exporter formats scripts into code files on disk and tool_calls into JSON and transcript Markdown documents.
 #
-# ============================================================================
-# EXPORTER FIELD CONSUMERS (export_session_bundles)
-# ============================================================================
-#   session.time_created  -> folder name date prefix + SUMMARY.md date column
-#                          (None -> "nodate" / "N/A")
-#   session.agent         -> SUMMARY.md agent column (falls back to 'build')
-#   session.display_title -> folder name (via safe_name) + SUMMARY.md + on_progress callbacks
-#   session.id[:8]        -> per-session subfolder suffix (multi-session exports)
-#   subagents             -> len() shown in SUMMARY.md "Subs" column (not serialized individually)
-#   tool_calls            -> tool_calls.json + tool_calls_transcript.md emit counts
-#   scripts               -> script files + optional .patch files (write_patches=True default)
-#   Also: mark_session_exported(session.id, output_path, len(scripts), len(tool_calls)) is called
-#   per bundle after writing - which is why subsequent --list runs mark these sessions "[✓]".
-#
-# ============================================================================
-# CONSTRUCTION NOTES
-# ============================================================================
-#   - This dataclass performs no validation; you may construct it directly for tests with empty or
-#     partial lists. Default via field(default_factory=list) ensures each instance gets its OWN list
-#     (never a shared mutable default).
-#   - No __post_init__, no to_dict/from_dict methods exist here; JSON (de)serialization lives in the
-#     exporter formatters (format_session_info_json, format_tool_calls_json).
-#
-# EXPORT FORMAT OPTIONS & STRUCTURE (documented vocabulary):
-#   - Format 'scripts': Exports script files only (.py, .sh, .bash, .js, .ts, etc.)
-#   - Format 'bundles': Exports complete bundle as JSON object
-#   - Format 'both': Exports both code files and JSON bundle structure
-#   NOTE: the CLI does not expose a --format switch; it always calls export_session_bundles with
-#   export_scripts_flag=True and export_tool_calls=(args.tool_calls or True)=True, i.e. it always
-#   behaves like 'both'.
-#
-# BOUNDARY & EDGE CASE TESTS:
-#   - Session with no scripts or tool calls: exports valid empty list structure `scripts=[]`, `tool_calls=[]`.
-#   - Large session bundle with 100+ scripts: correctly serializes without memory overhead.
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.models.session_info import SessionInfo; from opencode_extractor.models.session_export_bundle import SessionExportBundle; s = SessionInfo("id", "title", "agent", "model", "dir", None, None, None); b = SessionExportBundle(session=s); print(len(b.scripts), len(b.tool_calls))' (outputs 0 0)
+
+# Dataclass decorator generating constructor __init__ and list defaults automatically
 @dataclass
 class SessionExportBundle:
+    # Line explanation: Primary root session metadata object
     session: SessionInfo
+    
+    # Line explanation: List of child subagent helper SessionInfo objects (defaults to empty list)
     subagents: List[SessionInfo] = field(default_factory=list)
+    
+    # Line explanation: List of extracted ScriptArtifact objects representing code files (defaults to empty list)
     scripts: List[ScriptArtifact] = field(default_factory=list)
+    
+    # Line explanation: List of extracted ToolCallArtifact objects representing tool execution logs (defaults to empty list)
     tool_calls: List[ToolCallArtifact] = field(default_factory=list)
