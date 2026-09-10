@@ -54,6 +54,21 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   7. Multi-database scenario: sessions spanning two SQLite DBs -> bundles correct across sources.
 #   Run: python3 -m pytest tests/test_extract_multiple_bundles.py -v
 # )
+# (API Contract Note: extract_multiple_bundles(extractor, root_session_ids, include_errors, on_progress)
+#   Parameters:
+#     extractor: OpenCodeExtractor instance
+#     root_session_ids: List[str] - Session IDs to extract (order preserved, duplicates processed separately)
+#     include_errors: bool = True - Passed through to extract_session_bundle
+#     on_progress: Optional[Callable[[int, int, str], None]] - Callback(current_1based, total, sid)
+#       Fires BEFORE each extraction, even for sessions that will fail
+#   Returns: List[SessionExportBundle] - successful bundles only, in input order
+#   Raises: Never (catches all exceptions per-session with bare `except Exception: continue`)
+#   Edge Cases:
+#     - Empty input []: returns [] immediately, no callback fired
+#     - Failed session: silently skipped, no bundle appended
+#     - Progress callback raises: exception propagates immediately, loop stops
+#     - Duplicate IDs: two separate bundles returned (no dedup)
+#   Stability: STABLE PUBLIC API)
 def extract_multiple_bundles(
     extractor, root_session_ids: List[str], include_errors: bool = True, on_progress=None
 ) -> List[SessionExportBundle]:

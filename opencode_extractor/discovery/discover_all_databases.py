@@ -105,6 +105,26 @@ from opencode_extractor.models.database_source import DatabaseSource
 #  (Compat Note: SQLite COUNT(*) query behavior is consistent across SQLite versions 3.x.
 #  However, the `session` table schema is assumed to exist. If OpenCode changes its database
 #  schema (adds/removes tables), this discovery will still list the file but with count 0.
+# (API Contract Note: discover_all_databases()
+#   Parameters: None
+#   Returns: List[DatabaseSource] - sorted by session_count descending (most sessions first)
+#   Raises: Never (all errors are swallowed)
+#   Discovery Behavior:
+#     - Scans DB_CANDIDATE_PATHS for .db/.sqlite files (SQLite sources)
+#     - Scans TEXT_DUMP_PATHS for .txt files (text dump sources)
+#     - Deduplicates by absolute path (found_paths set)
+#     - SQLite count failures: source still listed with session_count=0
+#     - Text dump read failures: source still listed with session_count=0
+#   Label Priority:
+#     1. ".local/share/opencode/opencode.db" -> "Primary Local SSD Database"
+#     2. "md.obsidian" -> "Obsidian Flatpak Database"
+#     3. "imported_databases" -> "Imported Backup DB"
+#     4. "/run/media/" -> "External Drive DB (<drive>)"
+#     5. else -> "Database: <basename>"
+#   Platform Compatibility:
+#     - Linux-only paths (XDG, /run/media)
+#     - Returns [] on Windows/macOS without warning
+#   Stability: STABLE PUBLIC API)
 def discover_all_databases() -> List[DatabaseSource]:
     # (DevOps Note: This function performs synchronous glob.glob() calls across multiple high-level directories
     #  (/run/media, /media, /mnt). On systems with slow USB/network mounts or automounter delays,

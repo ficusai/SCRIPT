@@ -165,6 +165,28 @@ class OpenCodeExtractor:
     #    - Test with no databases: should raise FileNotFoundError
     #    - Test with existing DB path: should initialize with that source
     #    - Test with "all": should include all discovered sources
+    # (API Contract Note: Constructor - OpenCodeExtractor.__init__(db_path)
+    #   Parameters:
+    #     db_path: Optional[str] = None
+    #       - None (default): Auto-discovers all databases via discover_all_databases()
+    #       - "all": Explicitly loads all discovered sources (same effect as None)
+    #       - "/absolute/path/to/db.sqlite": Loads only that specific file
+    #       - "nonexistent.db": Raises FileNotFoundError if file does not exist
+    #   Returns: None (constructor)
+    #   Raises:
+    #     - FileNotFoundError("No OpenCode session files found on disk.") when no sources found
+    #   Side Effects:
+    #     - Initializes self._conns (connection pool dict), self._sessions (lazy-loaded),
+    #       self._text_parts (lazy-loaded), self._file_counts_cache (lazy-loaded)
+    #   Thread Safety: NOT thread-safe for lazy initialization
+    #   Stability: STABLE API
+    # (Data Architecture Note: The facade manages three lazy-loaded caches that are populated on first access:
+    #   _sessions: Dict[str, SessionInfo] — keyed by session_id, first-wins deduplication across sources.
+    #   _text_parts: Dict[str, List[Tuple[str, dict]]] — keyed by session_id, for text-dump sources only.
+    #   _file_counts_cache: Dict[int, Tuple[int,int]] — keyed by source index, cached (scripts, tool_calls) counts.
+    # Once loaded, these caches are never refreshed. A long-lived facade instance will serve stale data if the
+    # underlying databases grow. The _conns dict (SQLite connection pool) persists across method calls.
+    # The db_path property returns the first source's path; None if no sources were loaded.)
     def __init__(self, db_path: Optional[str] = None):
         # (Line note: Discover all OpenCode database files on the system.
         #  discover_all_databases() scans common locations like ~/.local/share/opencode/ for .db and .txt files.
@@ -220,6 +242,13 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - If the database is corrupt or inaccessible, connect_sqlite() raises sqlite3.Error
     #    - Multiple calls with the same path return the SAME connection object (pool reuse)
+    # (API Contract Note: _connect_path(path) - Internal helper
+    #   Parameters:
+    #     path: str - Absolute path to SQLite database file
+    #   Returns: sqlite3.Connection (read-only mode)
+    #   Raises:
+    #     - sqlite3.Error if database is corrupt or inaccessible
+    #   Stability: INTERNAL API - subject to change)
     def _connect_path(self, path: str) -> sqlite3.Connection:
         return connect_sqlite(self._conns, path)
 
@@ -234,6 +263,12 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - Calling close() multiple times is safe (idempotent) - second call finds empty dict
     #    - Per-connection errors are swallowed; the method never raises
+    # (API Contract Note: close() - Releases all database connections
+    #   Parameters: None
+    #   Returns: None
+    #   Raises: Never (errors are silently ignored)
+    #   Idempotent: Yes - safe to call multiple times
+    #   Stability: STABLE API)
     def close(self) -> None:
         for conn in self._conns.values():
             try:
@@ -249,12 +284,22 @@ class OpenCodeExtractor:
     #   with OpenCodeExtractor(db_path="/path/to/db") as extractor:
     #       # use extractor here
     # Returns self so the instance is available inside the 'with' block.
+    # (API Contract Note: __enter__() - Context manager entry
+    #   Parameters: None
+    #   Returns: OpenCodeExtractor (self)
+    #   Stability: STABLE API - supports `with` statement)
     def __enter__(self) -> OpenCodeExtractor:
         return self
 
     # (Line note: Context manager exit point (__exit__) that automatically closes all database connections
     #  when leaving the 'with' block, even if an exception occurred inside the block.
     #  The *exc argument captures any exception info but is ignored here (connections are always closed).
+    # (API Contract Note: __exit__(*exc) - Context manager exit
+    #   Parameters:
+    #     *exc: Exception info tuple (type, value, traceback) - ignored
+    #   Returns: None
+    #   Raises: Never (connections always closed)
+    #   Stability: STABLE API)
     def __exit__(self, *exc) -> None:
         self.close()
 
@@ -317,6 +362,12 @@ class OpenCodeExtractor:
     # (Performance Note: Sorting the entire sessions dict on every call to all_sessions() is O(N log N).
     #  For large session sets (>100k), consider caching the sorted result and invalidating it only when
     #  new sources are added. Currently, both all_sessions() and root_sessions() trigger sorting independently.)
+    # (API Contract Note: all_sessions() - Returns all loaded sessions sorted chronologically
+    #   Parameters: None
+    #   Returns: List[SessionInfo] - sorted by time_created ascending (None timestamps first)
+    #   Raises: Never
+    #   Side Effects: Triggers lazy session loading on first call
+    #   Stability: STABLE API)
     def all_sessions(self) -> List[SessionInfo]:
         self._load_sessions()
         assert self._sessions is not None
@@ -338,6 +389,14 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - Never raises for a missing session ID; returns None gracefully
     #    - Case-sensitive matching: "sess_01" and "SESS_01" are different keys
+    # (API Contract Note: get_session(session_id) - Looks up a single session by ID
+    #   Parameters:
+    #     session_id: str - Unique session identifier
+    #   Returns: Optional[SessionInfo] - SessionInfo if found, None if not found
+    #   Raises: Never (returns None for missing IDs)
+    #   Side Effects: Triggers lazy session loading on first call
+    #   Case Sensitivity: Yes - "sess_01" and "SESS_01" are different keys
+    #   Stability: STABLE API)
     def get_session(self, session_id: str) -> Optional[SessionInfo]:
         self._load_sessions()
         assert self._sessions is not None
@@ -358,6 +417,12 @@ class OpenCodeExtractor:
     #  just to filter out subagents. For large datasets, this means sorting N sessions when only roots are needed.
     #  Consider a dedicated query or a cached root_sessions() list to avoid the O(N log N) sort when only
     #  root sessions are requested.)
+    # (API Contract Note: root_sessions() - Returns top-level sessions (excluding subagents)
+    #   Parameters: None
+    #   Returns: List[SessionInfo] - filtered to parent_id is None, sorted chronologically
+    #   Raises: Never
+    #   Side Effects: Calls all_sessions() which triggers lazy loading
+    #   Stability: STABLE API)
     def root_sessions(self) -> List[SessionInfo]:
         # (Line note: Filter all sessions to keep only those where is_subagent is False.
         #  is_subagent is True when parent_id is not None (i.e., the session has a parent).
@@ -394,6 +459,14 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - Raises KeyError with message "Session {root_id} not found in database" if the ID is missing
     #    - If the session exists but has no subagents, members list contains only the root
+    # (API Contract Note: root_tree(root_id) - Builds RootSession tree with all descendants
+    #   Parameters:
+    #     root_id: str - Unique session ID of root session
+    #   Returns: RootSession(info=SessionInfo, members=[SessionInfo, ...])
+    #   Raises:
+    #     - KeyError(f"Session {root_id} not found in database") if session ID missing
+    #   Side Effects: Triggers lazy session loading
+    #   Stability: STABLE API)
     def root_tree(self, root_id: str) -> RootSession:
         info = self.get_session(root_id)
         # (Line note: Raise KeyError if the session ID does not exist.
@@ -410,6 +483,11 @@ class OpenCodeExtractor:
     #  Output/effect:
     #    - Returns List[RootSession] with one tree per root session
     #    - Order matches root_sessions() (chronological, None timestamps first)
+    # (API Contract Note: all_root_trees() - Returns RootSession trees for ALL root sessions
+    #   Parameters: None
+    #   Returns: List[RootSession] - one tree per root session
+    #   Raises: Never (filters to root sessions first)
+    #   Stability: STABLE API)
     def all_root_trees(self) -> List[RootSession]:
         roots = self.root_sessions()
         return [self.root_tree(r.id) for r in roots]
@@ -424,6 +502,11 @@ class OpenCodeExtractor:
     #  tree (root + all descendants). With N root sessions, this results in O(N * M) part parsing where M is
     #  the average parts count. Consider batching all session trees together and parsing parts once, then
     #  distributing results per-session.)
+    # (API Contract Note: get_session_file_counts() - Returns script file counts per session
+    #   Parameters: None
+    #   Returns: Dict[str, int] - mapping session_id -> script file count
+    #   Raises: Never (delegates to count_session_files)
+    #   Stability: STABLE API)
     def get_session_file_counts(self) -> Dict[str, int]:
         return count_session_files(self)
 
@@ -477,6 +560,13 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - If the session ID does not exist, extract_scripts() handles this internally
     #    - Empty command strings produce no artifacts
+    # (API Contract Note: extract_scripts(root_session_id, include_errors) - Extracts script artifacts
+    #   Parameters:
+    #     root_session_id: str - Root session ID to extract scripts for
+    #     include_errors: bool = False - Include scripts from errored steps
+    #   Returns: List[ScriptArtifact]
+    #   Raises: Never (delegates to extract_scripts)
+    #   Stability: STABLE API)
     def extract_scripts(self, root_session_id: str, include_errors: bool = False) -> List[ScriptArtifact]:
         return extract_scripts(self, root_session_id, include_errors=include_errors)
 
@@ -489,6 +579,12 @@ class OpenCodeExtractor:
     #  Output/effect:
     #    - Returns List[ToolCallArtifact] sorted chronologically
     #    - Each artifact has call_id, tool_name, input_params, output, status, time, etc.
+    # (API Contract Note: extract_tool_calls(root_session_id) - Extracts all tool call records
+    #   Parameters:
+    #     root_session_id: str - Root session ID to extract tool calls for
+    #   Returns: List[ToolCallArtifact] - sorted chronologically by time ascending
+    #   Raises: KeyError if session ID not found (via root_tree)
+    #   Stability: STABLE API)
     def extract_tool_calls(self, root_session_id: str) -> List[ToolCallArtifact]:
         return extract_tool_calls(self, root_session_id)
 
@@ -504,6 +600,14 @@ class OpenCodeExtractor:
     #
     #  Edge cases & errors:
     #    - Raises KeyError if the session ID does not exist
+    # (API Contract Note: extract_session_bundle(root_session_id, include_errors) - Full bundle extraction
+    #   Parameters:
+    #     root_session_id: str - Root session ID to bundle
+    #     include_errors: bool = True - Include data from errored steps
+    #   Returns: SessionExportBundle with session, subagents, scripts, tool_calls
+    #   Raises:
+    #     - KeyError(f"Session {root_session_id} not found in database") if ID missing
+    #   Stability: STABLE API - Primary extraction method)
     def extract_session_bundle(self, root_session_id: str, include_errors: bool = True) -> SessionExportBundle:
         return extract_session_bundle(self, root_session_id, include_errors=include_errors)
 
@@ -517,6 +621,18 @@ class OpenCodeExtractor:
     #
     #  Output/effect:
     #    - Returns List[SessionExportBundle] with one bundle per input session ID
+    # (API Contract Note: extract_multiple_bundles(root_session_ids, include_errors, on_progress)
+    #   Parameters:
+    #     root_session_ids: List[str] - Session IDs to extract bundles for
+    #     include_errors: bool = True - Include errored step data
+    #     on_progress: Optional[Callable[[int, int, str], None]] - Progress callback
+    #   Returns: List[SessionExportBundle] - successful bundles only (failures skipped)
+    #   Raises: Never (catches all exceptions per-session and continues)
+    #   Edge Cases:
+    #     - Empty input list returns empty list without calling callback
+    #     - Duplicate IDs produce duplicate bundles
+    #     - Progress callback fires for EVERY session including failed ones
+    #   Stability: STABLE API)
     def extract_multiple_bundles(
         self, root_session_ids: List[str], include_errors: bool = True, on_progress=None
     ) -> List[SessionExportBundle]:
@@ -556,6 +672,16 @@ class OpenCodeExtractor:
     #    - Binary/non-UTF-8 files: invalid bytes are replaced with U+FFFD (never raises)
     #    - Missing file: returns None
     #    - Directory path: returns None (os.path.isfile returns False)
+    # (API Contract Note: _on_disk_content(path) - Static utility to read file content from disk
+    #   Parameters:
+    #     path: str - File system path to read
+    #   Returns: Optional[str] - File content as UTF-8 text, or None if unreadable
+    #   Raises: Never
+    #   Edge Cases:
+    #     - Binary/non-UTF-8 files: invalid bytes replaced with U+FFFD
+    #     - Missing file: returns None
+    #     - Directory path: returns None
+    #   Stability: INTERNAL API - static helper)
     @staticmethod
     def _on_disk_content(path: str) -> Optional[str]:
         return read_disk_content(path)

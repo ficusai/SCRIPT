@@ -75,6 +75,33 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #   7. status filtering: ALL statuses pass through (completed, error, running, pending, "").
 #   Run: python3 -m pytest tests/test_extract_tool_calls.py -v
 # )
+# (API Contract Note: extract_tool_calls(extractor, root_session_id)
+#   Parameters:
+#     extractor: OpenCodeExtractor instance
+#     root_session_id: str - Root session ID (must exist, raises KeyError if missing)
+#   Returns: List[ToolCallArtifact] - sorted by time ascending (None timestamps first)
+#   Raises:
+#     - KeyError if root_session_id not found (via root_tree)
+#   Field Construction Rules:
+#     - call_id: obj.get("callID") or obj.get("id") or "" (missing -> "")
+#     - tool_name: obj.get("tool") or "unknown"
+#     - status: any string accepted ("completed", "error", "running", "pending", "")
+#     - input_params: dict or wrapped as {"raw": value} if not dict
+#     - output: json.dumps(pretty) for dict/list, str() otherwise, None -> ""
+#     - error: string or None (non-string errors converted via str())
+#     - time: parsed ISO timestamp or None
+#   Edge Cases:
+#     - No de-duplication: same session in multiple sources appears multiple times
+#     - Missing callID/id: falls back to empty string
+#     - Complex outputs: serialized with json.dumps(indent=2)
+#   Stability: STABLE PUBLIC API)
+# (Data Architecture Note: extract_tool_calls is the primary data flow from the part table to ToolCallArtifact.
+#  It iterates over ALL members of the root tree (root + descendants), parsing each session's part rows.
+#  There is NO deduplication of tool calls — if a session_id appears in multiple sources, its tool calls
+#  appear multiple times in the output list. The status filter is NOT applied here (all statuses pass).
+#  The output list is sorted by timestamp ascending; records without timestamps sort to the front.
+#  Output count can exceed input part-row count due to the multi-session iteration.
+#  Memory: the full list is materialized before sorting; no streaming or pagination.)
 def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact]:
     # Retrieve the root session tree and create a lookup map of session details.
     tree = extractor.root_tree(root_session_id)

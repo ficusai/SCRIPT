@@ -57,6 +57,33 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   Run: python3 -m pytest tests/ -v  (after creating test dir)
 #   Manual CLI verification: python3 -m opencode_extractor extract-bundle sess_123
 # )
+# (Data Architecture Note: extract_session_bundle orchestrates the assembly of a SessionExportBundle
+#  by gathering data from multiple extraction pipelines. It is the primary data flow junction:
+#    1. get_session(root_session_id) -> SessionInfo (root metadata)
+#    2. root_tree(root_session_id) -> RootSession (session graph traversal)
+#    3. extract_scripts(...) -> List[ScriptArtifact] (file content extraction)
+#    4. extract_tool_calls(...) -> List[ToolCallArtifact] (tool call history)
+#  These four data sources are combined into a single denormalized bundle for export.
+#  IMPORTANT: tool_calls are NEVER error-filtered (no include_errors param), so errored tool calls
+#  always appear in the bundle regardless of the include_errors setting passed to extract_scripts.)
+# (API Contract Note: extract_session_bundle(extractor, root_session_id, include_errors)
+#   Parameters:
+#     extractor: OpenCodeExtractor instance (no type validation)
+#     root_session_id: str - Unique session identifier (e.g. "sess_01HJ89XYZ")
+#     include_errors: bool = True - Whether to include errored step data in scripts
+#       NOTE: Tool calls are NEVER error-filtered regardless of this parameter
+#   Returns: SessionExportBundle with fields:
+#     - session: SessionInfo (root session metadata)
+#     - subagents: List[SessionInfo] (child sessions, DFS pre-order)
+#     - scripts: List[ScriptArtifact] (filtered by include_errors)
+#     - tool_calls: List[ToolCallArtifact] (always includes errors)
+#   Raises:
+#     - KeyError(f"Session {root_session_id} not found in database") if session ID missing
+#   Edge Cases:
+#     - Session with no subagents: subagents list is empty [], not None
+#     - Session as subagent ID: still extracts fine (uses its own children/scripts/tool_calls)
+#     - Cyclic parent links: handled by find_descendants() dedup
+#   Stability: STABLE PUBLIC API)
 def extract_session_bundle(extractor, root_session_id: str, include_errors: bool = True) -> SessionExportBundle:
     # Retrieve base information for the root session.
     # Variable Type: Optional[SessionInfo]

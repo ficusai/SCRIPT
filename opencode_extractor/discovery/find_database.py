@@ -46,6 +46,15 @@ from opencode_extractor.discovery.discover_all_databases import discover_all_dat
 #    - With databases present: should print the path string of the highest-count source
 #    - With no databases: should print None
 # )
+# (API Contract Note: find_database()
+#   Parameters: None
+#   Returns: Optional[str] - Path to highest-priority database, or None if no databases found
+#   Raises: Never
+#   Selection Logic:
+#     - Calls discover_all_databases() (sorted by session_count descending)
+#     - Returns dbs[0].path if list non-empty, else None
+#     - Tie breaking: first discovered source wins (stable sort preserves discovery order)
+#   Stability: STABLE PUBLIC API - Convenience function for CLI default)
 def find_database() -> Optional[str]:
     # (Line note: Run the full database discovery to get a list of all available database sources.
     #  The list is sorted by session_count descending (most sessions first).

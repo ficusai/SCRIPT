@@ -137,6 +137,30 @@ from opencode_extractor.utils.safe_name import safe_name
 #    - Test empty bundles: should create dest_dir with auto-named empty folder, return (0, 0, path)
 #    - Test with missing time_created: subfolder uses "nodate", SUMMARY.md shows "N/A"
 # )
+# (API Contract Note: export_session_bundles(bundles, dest_dir, ...)
+#   Parameters:
+#     bundles: List[SessionExportBundle] - Data to export (order determines subfolder numbering)
+#       Edge case: Empty list [] creates dest_dir but writes no files
+#     dest_dir: str - Output folder path (created with parents=True/exist_ok=True)
+#     export_tool_calls: bool = True - Write tool_calls.json + tool_calls_transcript.md
+#     export_scripts_flag: bool = True - Write script files and patches
+#     preserve_paths: bool = True - Keep directory structure (False flattens to basenames)
+#     create_zip: bool = False - Package as ZIP archive (ZIP_DEFLATED)
+#     write_patches: bool = True - Emit .patch files for edit diffs
+#     create_subfolder: bool = True - Nest under dest_dir/<folder_name> (ignored if create_zip=True)
+#     folder_name: Optional[str] = None - Custom base name (auto-generated if None)
+#     on_progress: Optional[Callable[[int, int, str], None]] - Callback(current, total, title)
+#   Returns: Tuple[int, int, str] = (scripts_written, tool_calls_written, final_output_path)
+#     - scripts_written: count of script files emitted (even empty content)
+#     - tool_calls_written: sum of len(bundle.tool_calls) (only when export_tool_calls=True)
+#     - final_output_path: directory path or ZIP file path
+#   Raises:
+#     - OSError/PermissionError if dest_dir cannot be created or written
+#     - Partial writes may occur on mid-export failure
+#   Name Collision Behavior:
+#     - Last write wins for duplicate paths within a bundle
+#     - ZIP mode: both entries exist, last wins on extraction
+#   Stability: STABLE PUBLIC API)
 def export_session_bundles(
     # (Parameter note: List of SessionExportBundle objects to export. Each bundle contains a session,
     #  its subagents, script artifacts, and tool call artifacts.
