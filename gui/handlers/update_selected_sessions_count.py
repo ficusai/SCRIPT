@@ -1,3 +1,8 @@
+# Module note: Update Selected Sessions Count Helper Handler.
+# Purpose: Recalculates selection counts and updates summary labels and export button text dynamically.
+# Plain-language overexplanation for beginners:
+# Whenever row checkboxes are toggled or table filters change, this helper counts how many sessions are selected and updates the summary text label (e.g. "Selected: 3 / 15 sessions") and export button label.
+
 from gui.handlers.get_selected_session_ids import get_selected_session_ids
 
 
