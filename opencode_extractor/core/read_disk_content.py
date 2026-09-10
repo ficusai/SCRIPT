@@ -1,5 +1,13 @@
 """
 Reads file contents directly from disk as a backup.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Any text-based file extension (.py, .js, .ts, .sh, .txt, .md, .json, etc.)
+- Formats Handled: UTF-8 text files, with graceful handling of non-UTF-8 bytes
+- Export Modes Supported: Fallback content reading when database-stored content is unavailable
+- Framework Possibilities:
+    - CLI: Reads script content from disk to include in export artifacts
+    - Web API: Reads file content for export responses when content is not in the database
 """
 
 from __future__ import annotations
@@ -8,38 +16,64 @@ import os
 from typing import Optional
 
 
-# Safely reads and returns the text content of a file from disk, returning None if the file cannot be accessed or read.
-# File Access & Encoding Robustness Logic:
-#   - Path verification: Validates path points to an active file on disk via os.path.isfile(path).
-#   - Safe Encoding: Opens with encoding="utf-8" and errors="replace". Any invalid byte sequences in binary or non-UTF-8 files
-#     are replaced with the Unicode replacement character (\ufffd) rather than throwing a UnicodeDecodeError.
-#   - Exception Safety: Catches (OSError, PermissionError) so unreadable files or broken symlinks return None cleanly.
-#     (FileNotFoundError is a subclass of OSError and is therefore covered too.)
-# Function Signature & Parameter Details:
-#   path (str): Absolute or relative file system path to read (e.g. "/home/user/project/main.py").
-#   Return value: Optional[str] -> the complete file content as a UTF-8 string, or None when reading fails.
-# Failure behavior decision table:
-#   - Existing readable text file  -> full string contents.
-#   - Non-existent path            -> None (isfile False).
-#   - Path is a directory          -> None (directories are not files).
-#   - Broken symlink               -> None (isfile False).
-#   - Permission denied (EACCES)   -> None.
-#   - Binary / non-UTF-8 bytes     -> content with invalid bytes replaced by \ufffd (never raises).
-#   - File deleted between isfile() and open() -> OSError subclass -> None.
-# Testing Values & Examples:
-#   - Existing readable text file: Returns file string contents.
-#   - Non-existent file path ("/tmp/missing_file.py"): Returns `None`.
-# Edge Cases:
-#   - File contains non-UTF-8 binary data: `errors="replace"` converts unreadable bytes to `\ufffd` placeholder characters without raising `UnicodeDecodeError`.
-#   - Permission denied or OS error: `(OSError, PermissionError)` caught -> Returns `None`.
-def read_disk_content(path: str) -> Optional[str]:
+# (Line note: This function safely reads the complete text content of a file from the local filesystem.
+#  It returns the file content as a UTF-8 string, or None if the file cannot be accessed or read for any reason.
+#
+#  Options:
+#    - Encoding: Always uses UTF-8
+#    - Error handling: Invalid byte sequences are replaced with the Unicode replacement character (U+FFFD)
+#
+#  Defaults:
+#    - Returns None for any file access error (missing file, permission denied, not a file, etc.)
+#
+#  Output/effect:
+#    - Returns str: the complete file content as a UTF-8 decoded string
+#    - Returns None: if the file cannot be read for any reason
+#
+#  Edge cases & errors:
+#    - Non-existent file path: os.path.isfile() returns False -> function returns None
+#    - Path is a directory: os.path.isfile() returns False -> function returns None
+#    - Broken symlink: os.path.isfile() returns False -> function returns None
+#    - Permission denied (EACCES): OSError is caught -> function returns None
+#    - Binary or non-UTF-8 file: errors="replace" converts invalid bytes to U+FFFD -> returns string with replacements
+#    - File deleted between isfile() check and open() call: OSError subclass is caught -> returns None
+#
+#  How to test:
+#    - Test with an existing readable text file: should return file content as string
+#    - Test with a non-existent path: should return None
+#    - Test with a directory path: should return None
+#    - Test with a binary file: should return string with replacement characters
+# )
+def read_disk_content(
+    # (Parameter note: Absolute or relative file system path to the file to read.
+    #  The path must point to an existing regular file (not a directory, not a broken symlink).
+    #  Example: "/home/user/project/main.py"
+    #  Example (relative): "src/utils/helpers.py"
+    #  Edge case: If the path contains spaces, they are handled correctly by open().
+    path: str,
+) -> Optional[str]:
     try:
-        # Verify that the path points to an actual file on disk.
+        # (Line note: Verify that the path points to an actual regular file on disk.
+        #  os.path.isfile() returns True only for regular files (not directories, symlinks to missing targets, etc.).
+        #  This check happens BEFORE open() to avoid unnecessary system calls for non-files.
         if os.path.isfile(path):
-            # Open file with UTF-8 encoding and replace unreadable characters safely.
+            # (Line note: Open the file for reading with UTF-8 encoding.
+            #  errors="replace" is critical: it means any byte sequence that is not valid UTF-8
+            #  is replaced with the Unicode replacement character (U+FFFD, displayed as �) instead of raising.
+            #  This prevents UnicodeDecodeError on binary files or files with mixed encodings.
             with open(path, "r", encoding="utf-8", errors="replace") as f:
+                # (Line note: Read the entire file content into a single string and return it.
+                #  The string may contain U+FFFD replacement characters if the file had invalid UTF-8 bytes.
                 return f.read()
+    # (Line note: Catch all OS-level file access errors in one broad except clause.
+    #  OSError is the parent class of FileNotFoundError, PermissionError, IsADirectoryError, etc.
+    #  Catching OSError is sufficient because FileNotFoundError is a subclass of OSError.
+    #  PermissionError is explicitly listed for clarity but is also a subclass of OSError.
+    #  Any of these errors means the file could not be read, so we return None.
     except (OSError, PermissionError):
-        # Ignore file access errors like missing permissions.
+        # (Line note: Silently ignore file access errors and fall through to return None.
+        #  This includes: file not found, permission denied, is a directory, broken symlink, etc.
         pass
+    # (Line note: Return None if the file could not be read for any reason.
+    #  This covers: path is not a file, path does not exist, permission denied, or any OS error.
     return None
