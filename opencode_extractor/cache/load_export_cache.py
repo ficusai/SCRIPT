@@ -72,17 +72,33 @@ from opencode_extractor.cache.ensure_cache_dir import CACHE_FILE, ensure_cache_d
 #      can lose each other's updates (last writer wins). Atomic replace in the single-session writer only prevents
 #      a torn file, not lost updates.
 #
-#  How to test:
-#    - Call `load_export_cache()` in a Python shell when no cache file exists -> should return {}
-#    - Call after writing a valid cache -> should return the exported_sessions dict
-#    - Call with a corrupted JSON cache file -> should return {} without crashing
-# )
+#  Data Integrity Considerations:
+#    - Cache file encoding: UTF-8 strict (read_text with encoding="utf-8"); invalid bytes raise UnicodeDecodeError
+#    - No schema version validation: "version" field is written but never checked on read
+#    - ISO 8601 timestamps in "exported_at" and "last_updated" are strings, not parsed to datetime
+#    - Integer fields (script_count, tool_call_count) are not type-checked; float or string values accepted
+#    - output_path values are opaque strings; no validation that the path exists or is writable
+#    - Session IDs in cache are the same format as source sessions; no transformation applied
+#    - Data recovery: Corrupted cache files are silently discarded; next export rebuilds from scratch
+#    - Backward compatibility: Adding new metadata keys to exported_sessions is safe (callers use .get())
+#    - Forward compatibility: Removing keys from schema breaks callers that expect those keys
+# (Data Note: Export cache loader. This is a best-effort reader that never raises exceptions.
+#  The cache file is human-readable JSON; manual editing is possible but risks corruption.
+#  The function drops version and last_updated fields, so callers cannot detect schema mismatches.
+#  If exported_sessions value is not a dict (e.g. corrupted to a list), downstream code using
+#  set() or 'in' checks may fail with TypeError. Defensive callers should validate the return type.)
 def load_export_cache() -> Dict[str, Dict[str, Any]]:
     # (Line note: Ensure the cache directory exists on disk before attempting to read the cache file.
     #  This creates ~/.local/share/opencode/ (and any missing parent directories) if they do not exist.
     #  Side Effect: Creates directory structure if missing
     #  Failure: If the directory cannot be created (permission denied, read-only filesystem),
     #           PermissionError propagates to the caller.
+    # (Performance Note: ensure_cache_dir() performs an os.makedirs() system call on every invocation.
+    #  For hot-path callers that check the cache frequently, consider caching the directory existence
+    #  check or using os.scandir() to batch directory operations. Also, the entire JSON cache file is
+    #  read and parsed into memory on every call — for large export histories, this becomes noticeable.
+    #  Consider process-level caching (functools.lru_cache) for callers that access the cache repeatedly
+    #  within a single session.)
     ensure_cache_dir()
 
     # (Line note: Check if the cache file exists on disk.
