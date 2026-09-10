@@ -279,6 +279,17 @@ def export_session_bundles(
     #    - In directory mode: writes to disk using target.write_text(content, encoding="utf-8", errors="replace")
     #      Parent directories are created automatically with mkdir(parents=True, exist_ok=True)
     def emit(rel_path: str, content: str):
+        # (Security Note: Path Traversal in Export - `rel_path` comes from user-controlled session data
+        #  (session titles, script file paths) and is used directly as a filesystem path via Path / rel_path.
+        #  While safe_name() is applied to individual path components, the full rel_path string is not
+        #  validated for ".." traversal sequences before being written. A crafted session title or script
+        #  path containing "../" could write files outside the intended export directory.
+        #  (CWE-22: Improper Limitation of a Pathname to a Restricted Directory)
+        #
+        # (Security Note: ZIP Slip Vulnerability - When create_zip=True, archive_path is constructed as
+        #  f"{folder_name}/{rel_path}". If rel_path contains "../" sequences, extraction of the ZIP could
+        #  overwrite files outside the intended destination directory (ZIP Slip, CWE-22).
+        #  Mitigation: callers should validate that resolved paths stay within the expected directory.
         if zf is not None:
             # (Line note: ZIP mode - construct the archive entry path with folder_name prefix.
             #  All entries are namespaced under folder_name/ to avoid collisions when extracting.
@@ -300,6 +311,9 @@ def export_session_bundles(
     # (Line note: Generate a master SUMMARY.md overview document when exporting multiple sessions.
     #  This provides a quick reference table showing all exported sessions at a glance.
     #  Condition: only generated when len(bundles) > 1.
+    # (Performance Note: summary_md is built as a list of strings then joined with "\n".join() at line 321.
+    #  This is actually the correct Python idiom for efficient string concatenation (avoids O(n^2) behavior
+    #  of repeated += on strings). No change needed here — this is already optimal.)
     if len(bundles) > 1:
         # (Line note: Build the SUMMARY.md content as a list of markdown lines.
         #  Structure:
@@ -466,6 +480,11 @@ def export_session_bundles(
     # (Line note: Close the ZIP file archive if one was opened.
     #  This flushes all buffered data and writes the ZIP central directory.
     #  After closing, the ZIP file is complete and can be extracted.
+    # (Performance Note: ZIP file creation uses ZipFile.writestr() for each entry, which writes entries
+    #  sequentially. For exports with hundreds of script files, consider using a larger buffer or
+    #  pre-compressing content before writing. Also, the ZIP central directory is only written on close(),
+    #  so a power failure mid-write could corrupt the archive. For critical exports, consider writing
+    #  to a temp file first and renaming atomically.)
     if zf is not None:
         zf.close()
         # (Line note: Return the counts and the ZIP file path.
