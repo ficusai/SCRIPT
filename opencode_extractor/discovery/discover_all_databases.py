@@ -84,6 +84,30 @@ from opencode_extractor.models.database_source import DatabaseSource
 #    - With multiple databases: should return them sorted by session_count descending
 # )
 def discover_all_databases() -> List[DatabaseSource]:
+    # (DevOps Note: This function performs synchronous glob.glob() calls across multiple high-level directories
+    #  (/run/media, /media, /mnt). On systems with slow USB/network mounts or automounter delays,
+    #  a single glob can block for several seconds. Run this in a background thread (as the GUI already does)
+    #  and consider adding a timeout wrapper for CI/headless environments.)
+    #
+    # (DevOps Note: No environment-variable override for search paths exists. Operators cannot restrict
+    #  discovery to specific volumes via OC_DB_SEARCH_PATHS without patching this file.
+    #  Consider reading $OC_DB_SEARCH_PATHS (newline-delimited list) and merging it with DB_CANDIDATE_PATHS.)
+    #
+    # (DevOps Note: On Windows, DB_CANDIDATE_PATHS is empty (the constant itself is a no-op), so this
+    #  function returns an empty list without any warning. Operators on Windows get silent "no databases found"
+    #  instead of a clear error message. Add a platform check that raises NotImplementedError with guidance.)
+    #
+    # (DevOps Note: The function performs an unbounded number of SQLite open/close operations during
+    #  counting (one per discovered .db file). For databases >1GB each, this can be slow. Consider
+    #  running the count in parallel (ThreadPoolExecutor) with a concurrency limit.)
+    #
+    # (DevOps Note: No cleanup of temporary SQLite connections occurs after the scan completes.
+    #  connect_sqlite() keeps connections in a module-level dict; this function never calls a close_all().
+    #  For long-running daemon processes, this causes a file-descriptor leak.)
+    #
+    # (DevOps Note: No logging is emitted when individual databases fail to open. Operators have no visibility
+    #  into which paths were skipped and why (permission denied, not a valid SQLite file, etc.).
+    #  Add structured logging (logging.info/warn) with the path and exception for each failure.)
     # (Line note: Set to keep track of file paths we have already processed to avoid duplicates.
     #  If two glob patterns match the same file, we only process it once.
     #  Variable Type: Set[str]
@@ -105,6 +129,16 @@ def discover_all_databases() -> List[DatabaseSource]:
     # (Performance Note: glob.glob() is called for EACH pattern in DB_CANDIDATE_PATHS sequentially. If the
     #  patterns target network mounts or slow USB drives, each glob can take seconds. Consider parallelizing
     #  glob calls with concurrent.futures.ThreadPoolExecutor, especially when scanning multiple mount points.)
+    #
+    # (Security Note: Unrestricted Disk Scan - glob.glob() is called against filesystem paths including
+    #  ~/Desktop, ~/Downloads, /run/media/*, and wildcard patterns like **/*.db. These scans can match
+    #  hundreds of files across external drives. No path allowlist or permission check is performed.
+    #  An attacker who can modify DB_CANDIDATE_PATHS at import time could cause the program to read
+    #  arbitrary .db files from anywhere on the filesystem. (CWE-22: Improper Limitation of a Pathname))
+    #
+    # (Security Note: No Symlink Follow Prevention - glob.glob() follows symlinks by default. A symlink
+    #  pointing to a sensitive database file (e.g., /etc/shadow.db) would be discovered and its session
+    #  count queried. The os.path.isfile() check does not reject symlinks.)
     for pattern in DB_CANDIDATE_PATHS:
         # (Line note: Use glob to match wildcard path patterns on disk.
         #  glob.glob(pattern) returns a list of absolute file path strings that match the pattern.
