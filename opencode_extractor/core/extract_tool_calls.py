@@ -65,9 +65,16 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #   - Output is complex object (dict or list): Formatted with `json.dumps(out_val, indent=2)`.
 #   - Error field is non-string (e.g. object): Converted via `str(err_msg)`.
 #   - Tool timestamp is missing or null: Sorted to start of list via datetime.min fallback.
-# Testing Steps:
-#   - Call `extract_tool_calls(extractor, "sess_123")`
-#   - Verify returned list is sorted by `time` ascending
+# (Test Note: Missing test suite — add pytest tests for:
+#   1. Chronological sort: verify output ordered by time ascending, None-timestamp records first.
+#   2. Complex output serialization: dict/list outputs -> json.dumps(pretty-printed); scalar -> str().
+#   3. Error field coercion: non-string error -> str(err_msg); missing -> None.
+#   4. Missing callID/id: call_id defaults to "".
+#   5. Unknown session ID in parts: agent/title/is_subagent/db_source_path default to empty/False.
+#   6. Multi-source dedup gap: same session in two DBs -> tool calls appear TWICE (known limitation).
+#   7. status filtering: ALL statuses pass through (completed, error, running, pending, "").
+#   Run: python3 -m pytest tests/test_extract_tool_calls.py -v
+# )
 def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact]:
     # Retrieve the root session tree and create a lookup map of session details.
     tree = extractor.root_tree(root_session_id)
@@ -76,6 +83,10 @@ def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact
 
     # Parse JSON database entries for all steps in the session tree.
     parts = parse_part_json(extractor.db_sources, extractor._conns, extractor._text_parts, session_ids)
+    # (Performance Note: Similar to extract_scripts, this loads ALL part rows into memory at once.
+    #  Additionally, json.dumps() is called for every tool call's output (line 93), which can be expensive
+    #  if outputs contain large nested structures. Consider serializing only when the output exceeds a
+    #  size threshold, or using a faster serializer like orjson if available.)
     tool_calls: List[ToolCallArtifact] = []
 
     # Loop through step entries to isolate tool calls.
