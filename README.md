@@ -1,12 +1,27 @@
-# "SCRIPT" by FICUS (ficusai)
+# "SCRIPT" by FICUS
 
-A desktop application and Python library for extracting scripts, tool calls, and session artifacts from OpenCode AI coding assistant databases.
+A desktop application and Python library for extracting scripts, tool calls, and session artifacts from OpenCode AI coding assistant databases (basically, your past sessions you had with your AI agents).
 
 ## Overview
 
-**SCRIPT by FICUS (ficusai)** scans SQLite databases and text dumps created by [OpenCode](https://opencode.ai) — an AI-powered coding agent — and extracts all code artifacts (scripts, configurations, patches) along with complete tool call transcripts. It provides both a GUI and CLI interface for browsing, filtering, and exporting session data.
+**SCRIPT by FICUS** scans SQLite databases and text dumps created by [OpenCode](https://opencode.ai) — an AI-powered coding agent — and extracts all code artifacts (scripts, configurations, patches) along with complete tool call transcripts. It provides both a GUI and CLI interface for browsing, filtering, and exporting session data.
 
 **GitHub:** https://github.com/ficusai/SCRIPT
+
+## Primary Use Cases
+
+1. **Extract AI Coding Sessions** — Pull structured data (scripts, tool calls, transcripts) from OpenCode AI assistant databases for archiving, analysis, or reuse
+2. **Desktop GUI + CLI Flexibility** — PyQt6 interface for browsing without command-line expertise; CLI for automation and batch processing
+3. **Multiple Export Formats** — JSON, Markdown, or ZIP archives with full transcripts and session metadata
+4. **Comprehensive Artifact Collection** — Scripts, tool call logs, subagent hierarchies, and patches bundled together
+5. **Fast Session Discovery** — Automatic SQLite database detection with caching layer for rapid repeated queries
+
+## Who Should Use This
+
+- **Researchers & Analysts** — Study AI coding assistant behavior and patterns
+- **Developers** — Archive and version-control AI-assisted code generation
+- **DevOps/SRE Teams** — Extract runnable scripts from coding sessions for deployment
+- **Organizations Using OpenCode** — Centralize and audit AI coding activity
 
 ## Features
 
@@ -181,17 +196,3 @@ Private repository. All rights reserved.
 - `discovery/` — Filesystem scanning for databases
 - `cache/` — Track exported sessions to avoid duplicates
 
-## Primary Use Cases
-
-1. **Extract AI Coding Sessions** — Pull structured data (scripts, tool calls, transcripts) from OpenCode AI assistant databases for archiving, analysis, or reuse
-2. **Desktop GUI + CLI Flexibility** — PyQt6 interface for browsing without command-line expertise; CLI for automation and batch processing
-3. **Multiple Export Formats** — JSON, Markdown, or ZIP archives with full transcripts and session metadata
-4. **Comprehensive Artifact Collection** — Scripts, tool call logs, subagent hierarchies, and patches bundled together
-5. **Fast Session Discovery** — Automatic SQLite database detection with caching layer for rapid repeated queries
-
-## Who Should Use This
-
-- **Researchers & Analysts** — Study AI coding assistant behavior and patterns
-- **Developers** — Archive and version-control AI-assisted code generation
-- **DevOps/SRE Teams** — Extract runnable scripts from coding sessions for deployment
-- **Organizations Using OpenCode** — Centralize and audit AI coding activity
