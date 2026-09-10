@@ -124,6 +124,11 @@ def build_export_settings_bar(window) -> QGroupBox:
     # (Accessibility Note: The export button lacks an accessible description explaining what will be exported.
     #  Consider calling setAccessibleDescription("Export selected sessions to the chosen folder") for screen
     #  reader users who may not understand the button's full purpose from the label alone.)
+    # (Keyboard Navigation Note: The export button is the last widget in tab order. Pressing Enter when
+    #  focused triggers export. Consider adding a Ctrl+E shortcut for accessibility.)
+    # (Error State Note: If no sessions are selected and user clicks Export, a modal dialog appears asking
+    #  to export all sessions. This is clear but the dialog title "No Sessions Checked" is technical.
+    #  Consider renaming to "No sessions selected" for friendlier messaging.)
     window.export_btn = QPushButton("💾 Export Selected Sessions & Tool Calls...")
     window.export_btn.setObjectName("exportButton")
     # Signal Connection: Open file chooser dialog and begin extraction when user clicks export button.
@@ -132,6 +137,14 @@ def build_export_settings_bar(window) -> QGroupBox:
     # Cancel path: clicking 'Cancel' in the folder dialog returns "" and the export aborts silently.
     window.export_btn.clicked.connect(lambda: export_selected_sessions_dialog(window))
     export_layout.addWidget(window.export_btn)
-    
+
+    # (Disabled State Note: During export, both export_btn and refresh_btn are disabled (setEnabled(False)).
+    #  The disabled state uses the stylesheet's default grey appearance but no spinner or progress indicator
+    #  is shown on the button itself. Consider showing a subtle loading state or tooltip explaining
+    #  "Export in progress..." to inform users the operation is running.)
+    # (Confirmation Note: The export process is destructive in the sense that it writes files to disk.
+    #  There is no confirmation dialog after folder selection. Consider adding a final confirmation step
+    #  showing the selected options summary before starting the export.)
+
     # Line note: Return completed panel container.
     return export_group
