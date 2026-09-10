@@ -198,6 +198,26 @@ from opencode_extractor.exporter.export_session_bundles import export_session_bu
 # TESTING EXTENSIONS EXTRACTED:
 #   - Python (.py), Shell (.sh, .bash), JavaScript (.js), TypeScript (.ts)
 def main() -> None:
+    # (DevOps Note: No --debug / -v / --verbose flag exists in this CLI. All diagnostic output goes to stdout
+    #  via plain print() calls, making it impossible to separate debug traces from normal output in CI pipelines
+    #  or remote logging sinks. Adding a --debug flag that sets logging.DEBUG would improve operational visibility.)
+    #
+    # (DevOps Note: No environment-variable override for the output directory exists. Operators cannot
+    #  pre-configure a default --out path via OC_EXTRACTOR_OUT or similar env var for scripted/CI use.)
+    #
+    # (DevOps Note: Missing error handling — FileNotFoundError, PermissionError, KeyError, and
+    #  sqlite3.OperationalError all propagate as uncaught tracebacks with non-zero exit codes.
+    #  For production/CICD use, wrapping the body in a try/except that returns a clean error message
+    #  and an appropriate POSIX exit code (1 for runtime errors, 2 for usage errors) is recommended.)
+    #
+    # (DevOps Note: The --tool-calls flag has no functional effect — export_session_bundles is always called
+    #  with export_tool_calls=True regardless of the flag value (see line: export_tool_calls=args.tool_calls or True).
+    #  This is a silent bug: users who explicitly pass --no-tool-calls or omit the flag still get tool calls exported.
+    #  Fix: change `args.tool_calls or True` to `args.tool_calls`.)
+    #
+    # (DevOps Note: The CLI has no idempotency guard for partial exports. If a bulk --all export is interrupted
+    #  (Ctrl+C, OOM), partially written files remain on disk and the cache may contain stale entries.
+    #  Consider adding atomic writes (write to temp dir, rename on success) for the export folder.)
     # Set up the command-line argument parser to handle options typed by the user.
     # Instantiate ArgumentParser object
     ap = argparse.ArgumentParser(description="OpenCode multi-format session script & tool call extractor")
