@@ -1,5 +1,14 @@
 """
 Formats tool call logs as a JSON string.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (Tool calls array output format)
+- Formats Handled: JSON array of tool call objects formatted with 2-space indentation
+- Export Modes Supported: Single session export bundle tool calls serializer
+- Framework Possibilities:
+    - CLI: Generates tool_calls.json file during export
+    - REST API: Exposes session tool call telemetry endpoints
+    - ML / Analytics: Prepares structured tool execution dataset for model evaluation
 """
 
 from __future__ import annotations
@@ -52,9 +61,16 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   - Empty tool call list: Returns string `"[]"`.
 #   - Input parameters contains raw unparsed objects: Preserved as dictionary.
 #   - Timestamp is null: Formatted as `null` in JSON output.
+# Testing Steps:
+#   - Pass `bundle` to `format_tool_calls_json(bundle)`
+#   - Verify returned output starts with `[` and ends with `]`
 def format_tool_calls_json(bundle: SessionExportBundle) -> str:
+    # Initialize list to hold serialized dictionary records
+    # Variable Type: List[Dict[str, Any]]
     records = []
+
     # Build list of tool call dictionary records.
+    # Iteration Target: bundle.tool_calls (List[ToolCallArtifact])
     for tc in bundle.tool_calls:
         records.append({
             "call_id": tc.call_id,
@@ -69,5 +85,8 @@ def format_tool_calls_json(bundle: SessionExportBundle) -> str:
             "output": tc.output,
             "error": tc.error,
         })
+
     # Return formatted JSON string with 2-space indentation.
+    # Output: str JSON array representation of tool call logs
     return json.dumps(records, indent=2)
+
