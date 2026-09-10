@@ -106,9 +106,20 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #     filePath key keeps the raw string.
 #   - Non-script files (e.g. binaries, logs) filtered out by `is_script_path`.
 #   - Two subagent sessions editing the same file -> merged artifact with multiple patches; additions/deletions accumulate.
-# Testing Steps:
-#   - Call `extract_scripts(extractor, "sess_123", include_errors=False)`
-#   - Verify returned list is sorted by `filePath.lower()`
+# (Test Note: Missing test suite — add pytest tests for:
+#   1. write-only session: source_kind="write_content", content populated from inp.get("content").
+#   2. edit-only without disk file: source_kind="patches_only", content="", patches populated.
+#   3. write+edit same filePath: content backfilled from write, patches appended, source_kind stays write_content.
+#   4. bash heredoc: parse_bash_artifacts yields ScriptArtifact with source_kind="bash_heredoc".
+#   5. include_errors=False filters out status="error" writes/edits/bashes.
+#   6. include_errors=True includes error-status entries with their original status string.
+#   7. Non-script files (binary, .log, .png): filtered by is_script_path, absent from output.
+#   8. Sort order: output sorted by filePath.lower() ascending (stable sort preserves insertion order on ties).
+#   9. Windows paths: backslashes normalized to "/" for key lookup but raw path kept as artifact key.
+#   10. Missing root session: KeyError from root_tree propagates up, not caught here.
+#   11. Dedup by filePath only: bash artifact does NOT overwrite existing write/edit entry for same path.
+#   Run: python3 -m pytest tests/test_extract_scripts.py -v
+# )
 def extract_scripts(extractor, root_session_id: str, include_errors: bool = False) -> List[ScriptArtifact]:
     # Retrieve the hierarchy of sessions including the root and subagents.
     # Returns RootTree object with `members` and `all_ids` properties
@@ -118,6 +129,10 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
 
     # Parse JSON database rows for all tool operations in these sessions.
     # Yields tuples of (session_id_str, parsed_json_dict)
+    # (Performance Note: parse_part_json() materializes ALL part rows for ALL session IDs in the tree into
+    #  a single list in memory. For a session tree with thousands of steps across multiple subagents, this
+    #  list can be hundreds of MB. Consider a streaming/generator-based approach that processes parts in
+    #  chunks rather than loading everything at once.)
     parts = parse_part_json(extractor.db_sources, extractor._conns, extractor._text_parts, session_ids)
     artifacts: Dict[str, ScriptArtifact] = {}
     written: Dict[str, ScriptArtifact] = {}
@@ -156,7 +171,11 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
         if tool == "write":
             fp = inp.get("filePath") or ""
             content = inp.get("content") or ""
-            # Validate path and verify script file type
+            # (Security Note: Path Traversal - The filePath from tool input is used directly without sanitization.
+            #  A crafted write call could set filePath to "../../etc/malicious.sh" to write outside the project.
+            #  Mitigation: is_script_path() only checks the basename extension; callers should validate the
+            #  directory portion for ".." components before using the path on disk.
+            #  (CWE-22: Improper Limitation of a Pathname to a Restricted Directory)
             if not fp or not is_script_path(fp, content):
                 continue
             art = ScriptArtifact(
@@ -185,6 +204,10 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
             new = inp.get("newString") or ""
             if not fp or not is_script_path(fp):
                 continue
+            # (Security Note: Path Traversal in edit - filePath is used directly for artifact key and basename
+            #  computation. While is_script_path only validates the basename, the full path is stored as
+            #  artifact.filePath and later passed to read_disk_content() during backfill. The directory
+            #  portion is not checked for ".." traversal. (CWE-22)
             meta = state.get("metadata") or {}
             patch = meta.get("diff") or ""
             if not patch:
@@ -235,6 +258,10 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
                 art.content = prev.content
                 art.source_kind = "write_content"
             else:
+                # (Performance Note: read_disk_content() performs an os.path.isfile() + full file read for EACH
+                #  edit artifact that lacks a prior write. For sessions editing many files, this results in N
+                #  sequential disk I/O operations. Consider batching disk reads or caching read results per-path
+                #  within the function scope to avoid re-reading the same file if referenced by multiple edits.)
                 on_disk = read_disk_content(art.filePath)
                 if on_disk is not None:
                     art.content = on_disk
