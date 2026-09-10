@@ -1,3 +1,9 @@
+# Module note: Header Bar Component Builder.
+# Purpose: Constructs and returns the top navigation bar containing application title, database dropdown selector, search input, status filter dropdown, and refresh button.
+# Plain-language overexplanation for beginners:
+# This file builds the top header bar of the application screen.
+# It gives users control buttons to filter sessions by keyword text, choose between databases, filter by session status, or reload database records.
+
 # Line note: Import layout manager and interactive controls (labels, dropdowns, input boxes, buttons) from PyQt6.
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton
 # Line note: Import font control helper to customize title text size and weight.
