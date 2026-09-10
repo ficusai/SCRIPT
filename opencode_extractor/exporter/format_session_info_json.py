@@ -1,5 +1,14 @@
 """
 Formats session metadata and subagent details as a JSON string.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .json (Metadata format output)
+- Formats Handled: JSON string formatted with 2-space indentation
+- Export Modes Supported: Single session export bundle metadata formatter
+- Framework Possibilities:
+    - CLI: Generates session_info.json in export directory
+    - REST API: Formats session details for JSON responses
+    - Data Visualizers: Provides structured session metadata for dashboard rendering
 """
 
 from __future__ import annotations
@@ -59,9 +68,17 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 # Edge Cases:
 #   - ISO timestamp formatting: Handles `None` created timestamps by setting field value to `null`.
 #   - Empty subagents list: Serializes subagents as `[]` and subagent_count as `0`.
+# Testing Steps:
+#   - Pass `bundle` to `format_session_info_json(bundle)`
+#   - Verify returned string is valid JSON via `json.loads(result)`
 def format_session_info_json(bundle: SessionExportBundle) -> str:
+    # Extract primary session info model from bundle
+    # Variable Type: SessionInfo
     s = bundle.session
+
     # Extract subagent records into a list of dictionaries.
+    # Variable Type: List[Dict[str, Any]]
+    # Item Dict Keys: "id" (str), "title" (str), "agent" (str), "model" (str), "created" (Optional[str])
     sub_data = [
         {
             "id": sub.id,
@@ -72,7 +89,9 @@ def format_session_info_json(bundle: SessionExportBundle) -> str:
         }
         for sub in bundle.subagents
     ]
-    # Build complete metadata object.
+
+    # Build complete metadata dictionary object.
+    # Variable Type: Dict[str, Any]
     meta = {
         "id": s.id,
         "title": s.display_title,
@@ -85,5 +104,8 @@ def format_session_info_json(bundle: SessionExportBundle) -> str:
         "total_script_files": len(bundle.scripts),
         "total_tool_calls": len(bundle.tool_calls),
     }
+
     # Return formatted JSON string with 2-space indentation.
+    # Output: str pretty-printed JSON string
     return json.dumps(meta, indent=2)
+
