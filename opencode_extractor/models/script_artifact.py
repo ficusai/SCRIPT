@@ -39,14 +39,27 @@ from opencode_extractor.constants.ext_label import EXT_LABEL
 #   - additions: int (Optional, default=0) Count of added code lines.
 #   - deletions: int (Optional, default=0) Count of deleted code lines.
 #   - patches: List[str] (Optional, default=[]) List of unified diff patch strings.
-#   - edits: List[Tuple[str, str]] (Optional, default=[]) List of (old_text, new_text) edit tuples.
-#
-# Properties:
-#   - label -> str: Returns visual label string with emoji icon from EXT_LABEL dictionary, falling back to uppercased extension or "📄 FILE".
-#   - origin -> str: Returns "main session" or "<agent> subagent" depending on is_subagent flag.
-#
-# How to Test:
-#   - Run: python3 -c 'from opencode_extractor.models.script_artifact import ScriptArtifact; a = ScriptArtifact("a.py", "a.py", "py", "kind", "write", "write_content", "s1", "build", "Title", False, "completed", None); print(a.label, "|", a.origin)'
+    #   - edits: List[Tuple[str, str]] (Optional, default=[]) List of (old_text, new_text) edit tuples.
+    #
+    # Data Constraints & Edge Cases:
+    #   - filePath uses camelCase naming (inconsistent with snake_case convention elsewhere); may be relative or absolute
+    #   - extension is lowercase but extracted verbatim from filepath; no normalization applied
+    #   - kind field is a display label from EXT_LABEL dict; empty string "" if extension not found
+    #   - primary_tool values: "write", "edit", or "bash" — other values indicate corruption or future tool types
+    #   - source_kind values (enum-like): "write_content", "patches_only", "bash_heredoc", "bash_echo",
+    #     "bash_exec", "bash_inline", "on_disk" — unrecognized values break export routing logic
+    #   - patches field contains unified diff strings (--- / +++ headers); may be empty if no diff available
+    #   - edits field contains (old, new) tuple pairs from SEARCH/REPLACE operations; tuples must have exactly 2 elements
+    #   - content field stores raw file text; may contain any bytes if source was UTF-8 with replacement chars
+    #   - time field from parse_ts(); None if timestamp unavailable
+    #   - additions/deletions are line counts; negative values indicate reverse diffs and are possible
+    # (Data Note: Script artifact for extracted code. The patches field stores unified diff format strings
+    #  which may contain escape sequences, binary content markers, or empty hunks. The edits field stores
+    #  search/replace pairs where old_text must exactly match the target string (case-sensitive, byte-exact).
+    #  File paths with spaces are NOT handled by bash extraction regexes; paths from write/edit tools are preserved verbatim.)
+    #
+    # How to Test:
+    #   - Run: python3 -c 'from opencode_extractor.models.script_artifact import ScriptArtifact; a = ScriptArtifact("a.py", "a.py", "py", "kind", "write", "write_content", "s1", "build", "Title", False, "completed", None); print(a.label, "|", a.origin)'
 
 # Dataclass decorator creating constructor and field definitions automatically
 @dataclass
