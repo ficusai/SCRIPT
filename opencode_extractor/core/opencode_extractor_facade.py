@@ -85,6 +85,44 @@ from opencode_extractor.models.tool_call_artifact import ToolCallArtifact
 # )
 class OpenCodeExtractor:
 
+    # (DevOps Note: No connection-timeout or busy-timeout is configured on SQLite connections.
+    #  If the database is locked by another process (e.g., OpenCode itself writing to it),
+    #  connect_sqlite() will block until SQLite's default busy timeout (5s) expires, then raise
+    #  sqlite3.OperationalError. For production use, set conn.busy_timeout = 10000 (ms) to avoid
+    #  abrupt failures on transient locks.)
+    #
+    # (DevOps Note: The lazy-loading pattern (_sessions / _text_parts / _file_counts_cache) is NOT
+    #  thread-safe. Concurrent calls to all_sessions() from multiple threads can trigger duplicate
+    #  load_sessions() invocations and race on _sessions assignment. If the facade is used in a
+    #  multi-threaded context (e.g., Flask with threaded=True), add an threading.Lock around
+    #  _load_sessions().)
+    #
+    # (DevOps Note: Text-dump files passed as kind="sqlite" (via the synthetic DatabaseSource fallback
+    #  in __init__) will silently fail during SQL queries because they are not real databases.
+    #  The caller gets an empty result set instead of an informative error. Consider adding validation
+    #  that rejects non-.db/.sqlite paths with kind="sqlite".)
+    #
+    # (DevOps Note: No signal handlers (SIGTERM/SIGHUP) are registered. On Linux systems that send
+    #  SIGTERM to child processes (e.g., systemd, Docker), connections may be left open and SQLite
+    #  WAL files unreleased. Register atexit handlers or signal handlers to call close() gracefully.)
+    #
+    # (DevOps Note: Connection pool (_conns) has no maximum size. Under heavy multi-database usage,
+    #  file descriptors can be exhausted. Consider adding a max-pool-size limit and LRU eviction.)
+    #
+    # (DevOps Note: No data-migration path exists for cache schema version bumps. If CACHE_FILE
+    #  format changes (e.g., version 1 -> 2), old cache files are silently ignored by
+    #  load_export_cache() (returns {}). Operators should document a migration procedure for
+    #  zero-downtime upgrades.)
+    #
+    # (DevOps Note: Missing platform support for Windows — XDG paths (~/.local/share/...) are Linux-only.
+    #  On Windows, the app would fall back to HOME=~ which resolves to %USERPROFILE% and may not exist.
+    #  Add platform detection (sys.platform == 'win32') and platform-appropriate paths for production.)
+    #
+    # (DevOps Note: The facade caches loaded sessions in memory for the lifetime of the instance.
+    #  There is no refresh/reload mechanism. If the underlying database changes while the facade is alive
+    #  (e.g., OpenCode adds a new session), the facade will NOT see the new data until a new instance
+    #  is created. Document this limitation for operators running long-lived processes.)
+
     # (Line note: Constructor method that initializes the extractor by discovering databases or using a specified path.
     #
     #  Parameters:
@@ -215,6 +253,10 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - This method is NOT thread-safe: concurrent calls could trigger duplicate loading
     #    - Once loaded, _sessions is never invalidated (no refresh mechanism)
+    # (Performance Note: All sessions from ALL discovered sources are loaded into memory at once on first access.
+    #  For systems with many databases totaling millions of sessions, this can consume significant RAM (each
+    #  SessionInfo object has ~10 fields). Consider implementing a per-source or per-query lazy loader that
+    #  only loads sessions matching a filter predicate, rather than the current eager full-load strategy.)
     def _load_sessions(self) -> None:
         # (Line note: Early return if sessions are already loaded (cached).
         if self._sessions is not None:
@@ -256,6 +298,9 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - If no sessions exist, returns an empty list []
     #    - Dump-only sessions (time_created=None) always appear at the beginning
+    # (Performance Note: Sorting the entire sessions dict on every call to all_sessions() is O(N log N).
+    #  For large session sets (>100k), consider caching the sorted result and invalidating it only when
+    #  new sources are added. Currently, both all_sessions() and root_sessions() trigger sorting independently.)
     def all_sessions(self) -> List[SessionInfo]:
         self._load_sessions()
         assert self._sessions is not None
@@ -293,6 +338,10 @@ class OpenCodeExtractor:
     #  Edge cases & errors:
     #    - If all sessions are subagents (no roots), returns an empty list
     #    - Sort order is the same as all_sessions() (chronological, None timestamps first)
+    # (Performance Note: root_sessions() calls all_sessions() which triggers a full sort of all sessions
+    #  just to filter out subagents. For large datasets, this means sorting N sessions when only roots are needed.
+    #  Consider a dedicated query or a cached root_sessions() list to avoid the O(N log N) sort when only
+    #  root sessions are requested.)
     def root_sessions(self) -> List[SessionInfo]:
         # (Line note: Filter all sessions to keep only those where is_subagent is False.
         #  is_subagent is True when parent_id is not None (i.e., the session has a parent).
@@ -354,6 +403,11 @@ class OpenCodeExtractor:
     #
     #  Output/effect:
     #    - Returns Dict[str, int] mapping session_id -> number of script files extracted
+    # (Performance Note: This is the primary N+1 query hotspot. count_session_files() calls extract_scripts()
+    #  for EACH root session independently. Each extract_scripts() call re-parses ALL part rows for the session
+    #  tree (root + all descendants). With N root sessions, this results in O(N * M) part parsing where M is
+    #  the average parts count. Consider batching all session trees together and parsing parts once, then
+    #  distributing results per-session.)
     def get_session_file_counts(self) -> Dict[str, int]:
         return count_session_files(self)
 
