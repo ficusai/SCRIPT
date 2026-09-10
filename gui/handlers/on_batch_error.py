@@ -1,3 +1,8 @@
+# Module note: Batch Export Error Handler Callback.
+# Purpose: Handles failures during batch export background operations.
+# Plain-language overexplanation for beginners:
+# If saving files fails (for example, if the disk is full or the destination directory is protected), this callback hides the progress bar, re-enables buttons, and pops up an error message dialog explaining what went wrong.
+
 from PyQt6.QtWidgets import QMessageBox
 
 
