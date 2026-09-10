@@ -94,6 +94,9 @@ def mark_multiple_sessions_exported(
         #  The `if sid:` check treats None, "", and any falsy value as a reason to skip.
         #  This prevents corrupting the cache with empty or invalid keys.
         if sid:
+            sid = str(sid).strip()
+            if not sid:
+                continue
             # (Line note: Build the metadata dictionary for this session and store it in the cache.
             #  If sid already exists in the cache, this REPLACES the existing entry (full overwrite, not merge).
             #  Output: New or updated dict entry in `cache` map keyed by `sid`

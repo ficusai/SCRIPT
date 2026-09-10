@@ -74,7 +74,7 @@ def connect_sqlite(conns: Dict[str, sqlite3.Connection], path: str) -> sqlite3.C
         #  encoding on all platforms (PEP 597), so this is safe on supported Python versions.)
         # Use pathlib.Path.as_uri() for cross-platform URI construction (handles Windows backslashes).
         from pathlib import Path
-        uri = str(Path(path).as_uri()) + "?mode=ro"
+        uri = str(Path(path).resolve().as_uri()) + "?mode=ro"
 
         # Open the connection using SQLite's URI mode.
         # Function Call: sqlite3.connect(uri, uri=True)

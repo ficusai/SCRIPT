@@ -62,9 +62,12 @@ def export_selected_sessions_dialog(window):
         #  more helpful. Consider rephrasing to: "No sessions selected. Export all {N} sessions?" with the
         #  buttons labeled "Export All" and "Cancel" for clearer action understanding.)
         if reply == QMessageBox.StandardButton.Yes:
-            # Check all session boxes and retrieve IDs again.
+            # Select all root sessions directly
+            sids = [s.id for s in window.root_sessions]
+            if not hasattr(window, "checked_sids"):
+                window.checked_sids = set()
+            window.checked_sids.update(sids)
             select_all_sessions(window)
-            sids = get_selected_session_ids(window)
         else:
             # User chose 'No'; abort export.
             return

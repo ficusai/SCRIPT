@@ -44,6 +44,21 @@ def filter_sessions(window):
 
     # Step 3: Block signals on session_table to avoid triggering selection change handlers while rebuilding table rows.
     window.session_table.blockSignals(True)
+    
+    # Save current checkbox state for visible rows before clearing
+    if not hasattr(window, "checked_sids"):
+        window.checked_sids = set()
+    for r in range(window.session_table.rowCount()):
+        item1 = window.session_table.item(r, 1)
+        title_item = window.session_table.item(r, 4)
+        if item1 and title_item:
+            sid = title_item.data(Qt.ItemDataRole.UserRole)
+            if sid:
+                if item1.checkState() == Qt.CheckState.Checked:
+                    window.checked_sids.add(sid)
+                else:
+                    window.checked_sids.discard(sid)
+
     # Step 4: Reset table row count to 0 to clear existing rows.
     window.session_table.setRowCount(0)
     matching = []
@@ -93,7 +108,10 @@ def filter_sessions(window):
         # Create date column item with an interactive checkbox item.
         date_item = QTableWidgetItem(dt_str)
         date_item.setFlags(date_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        date_item.setCheckState(Qt.CheckState.Unchecked)
+        if s.id in window.checked_sids:
+            date_item.setCheckState(Qt.CheckState.Checked)
+        else:
+            date_item.setCheckState(Qt.CheckState.Unchecked)
 
         # Create agent name, script count, and display title table items.
         agent_item = QTableWidgetItem(s.agent or "build")

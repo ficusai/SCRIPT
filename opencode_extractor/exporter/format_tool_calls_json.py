@@ -183,4 +183,4 @@ def format_tool_calls_json(
     #  json.dumps() with indent=2 produces human-readable output.
     #  Output: str JSON array representation of tool call logs
     #  Example output: "[\n  {\n    \"call_id\": \"...\",\n    ...\n  }\n]"
-    return json.dumps(records, indent=2)
+    return json.dumps(records, indent=2, default=str)

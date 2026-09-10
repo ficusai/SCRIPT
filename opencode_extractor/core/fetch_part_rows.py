@@ -122,6 +122,8 @@ def fetch_part_rows(
     #  SQLite NULL data columns yield (sid, None) which downstream json.loads() rejects.)
     ids = list(session_ids)
 
+    text_dump_processed = False
+    
     # Process each database source registered in the system.
     # Iteration Target: db_sources (List[DatabaseSource])
     for src in db_sources:
@@ -131,29 +133,30 @@ def fetch_part_rows(
                 con = connect_sqlite(conns, src.path)
 
                 # Chunk ID list into batches of 200 to stay well within SQLite SQL variable limits.
-                # Chunk Size: 200 items per SQL query batch
-                # (Performance Note: The hardcoded chunk size of 200 is conservative (SQLite default limit is 999).
-                #  For systems with ample resources, increasing this to 500-900 could reduce SQL round-trips by
-                #  2-3x for large session_id lists. Measure with your typical dataset size to find the optimal value.)
                 for i in range(0, len(ids), 200):
                     chunk = ids[i:i + 200]
                     # Generate dynamic SQL placeholder string (?, ?, ...).
                     ph = ",".join("?" * len(chunk))
 
-                    # Execute SQL SELECT statement to fetch matching part table records.
-                    # Yields tuples: (session_id: str, data: str)
-                    # (Performance Note: Using yield from with con.execute() streams rows one at a time, which is
-                    #  memory-efficient. However, the caller (parse_part_json) immediately materializes all yielded
-                    #  rows into a list, negating the streaming benefit. To realize streaming advantages, downstream
-                    #  consumers should process rows as they arrive rather than collecting them all.)
-                    yield from con.execute(
-                        f"SELECT session_id, data FROM part WHERE session_id IN ({ph})", chunk
-                    )
+                    try:
+                        cursor = con.execute(f"SELECT session_id, data FROM part WHERE session_id IN ({ph})", chunk)
+                        while True:
+                            try:
+                                row = cursor.fetchone()
+                                if row is None:
+                                    break
+                                yield row
+                            except Exception:
+                                # Catch decoding errors per-row and skip the bad row
+                                continue
+                    except Exception:
+                        continue
             except Exception:
                 # Swallows database read or connection exceptions cleanly
                 continue
 
-        elif src.kind == "text_dump" and text_parts:
+        elif src.kind == "text_dump" and text_parts and not text_dump_processed:
+            text_dump_processed = True
             # (Performance Note: Linear scan `if sid in text_parts` inside the outer loop makes this branch
             #  O(K * T) where K = len(session_ids) and T = number of text_dump sessions. Since dict key lookup
             #  is O(1) amortized, the effective complexity is O(K). However, the inner loop iterates over ALL

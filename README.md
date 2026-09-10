@@ -184,7 +184,7 @@ Private repository. All rights reserved.
 ## Primary Use Cases
 
 1. **Extract AI Coding Sessions** — Pull structured data (scripts, tool calls, transcripts) from OpenCode AI assistant databases for archiving, analysis, or reuse
-2. **Desktop GUI + CLI Flexibility** — PySide6 interface for browsing without command-line expertise; CLI for automation and batch processing
+2. **Desktop GUI + CLI Flexibility** — PyQt6 interface for browsing without command-line expertise; CLI for automation and batch processing
 3. **Multiple Export Formats** — JSON, Markdown, or ZIP archives with full transcripts and session metadata
 4. **Comprehensive Artifact Collection** — Scripts, tool call logs, subagent hierarchies, and patches bundled together
 5. **Fast Session Discovery** — Automatic SQLite database detection with caching layer for rapid repeated queries

@@ -40,9 +40,7 @@ from __future__ import annotations
 # Function declaration: Takes a file path string and returns a lowercased file extension string
 def file_extension(path: str) -> str:
     # Line explanation: Converts None to "", normalizes Windows backslashes '\\' to POSIX forward slashes '/', and extracts the final filename after the last slash.
-    # Options: Accepts POSIX paths ("a/b.py"), Windows paths ("a\\b.py"), or bare filenames ("b.py"). Default for None/falsy path is "".
-    # Output: Variable 'name' holds the isolated filename string (e.g. "script.py", "deploy.SH", ".gitignore", "Dockerfile").
-    name = (path or "").replace("\\", "/").rsplit("/", 1)[-1]
+    name = (path or "").strip().replace("\\", "/").rsplit("/", 1)[-1]
     
     # Line explanation: Checks if a period (dot '.') character exists anywhere in the isolated filename string.
     # Edge case: If there is no dot (e.g. "Dockerfile", "README", "script"), no file extension exists.

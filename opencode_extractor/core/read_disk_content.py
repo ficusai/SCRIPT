@@ -45,25 +45,14 @@ from typing import Optional
 #    - Test with a binary file: should return string with replacement characters
 # )
 def read_disk_content(
-    # (Parameter note: Absolute or relative file system path to the file to read.
-    #  The path must point to an existing regular file (not a directory, not a broken symlink).
-    #  Example: "/home/user/project/main.py"
-    #  Example (relative): "src/utils/helpers.py"
-    #  Edge case: If the path contains spaces, they are handled correctly by open().
     path: str,
+    max_size: int = 10 * 1024 * 1024,
 ) -> Optional[str]:
     try:
-        # (Line note: Verify that the path points to an actual regular file on disk.
-        #  os.path.isfile() returns True only for regular files (not directories, symlinks to missing targets, etc.).
-        #  This check happens BEFORE open() to avoid unnecessary system calls for non-files.
         if os.path.isfile(path):
-            # (Line note: Open the file for reading with UTF-8 encoding.
-            #  errors="replace" is critical: it means any byte sequence that is not valid UTF-8
-            #  is replaced with the Unicode replacement character (U+FFFD, displayed as �) instead of raising.
-            #  This prevents UnicodeDecodeError on binary files or files with mixed encodings.
+            if os.path.getsize(path) > max_size:
+                return None
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                # (Line note: Read the entire file content into a single string and return it.
-                #  The string may contain U+FFFD replacement characters if the file had invalid UTF-8 bytes.
                 return f.read()
     # (Line note: Catch all OS-level file access errors in one broad except clause.
     #  OSError is the parent class of FileNotFoundError, PermissionError, IsADirectoryError, etc.

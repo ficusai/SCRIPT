@@ -186,51 +186,35 @@ def load_text_dump_sessions(
                 sid, mid, payload = parts[0], parts[1], parts[2]
                 try:
                     # (Line note: Parse the raw JSON payload string into a Python dictionary object.
-                    #  json.loads() handles standard JSON syntax: objects {}, arrays [], strings "", numbers, booleans, null.
-                    #  If the payload is not valid JSON, this raises json.JSONDecodeError (caught by the except below).
                     obj = json.loads(payload)
                 except Exception:
-                    # (Line note: Skip lines with malformed JSON. The error is caught and the line is silently ignored.
-                    #  This prevents a single corrupt line from breaking the entire file parse.
                     continue
 
-                # (Line note: Ensure the text_parts entry for this session ID exists before appending.
-                #  If this is the first part seen for this session, initialize an empty list.
                 if sid not in text_parts:
                     text_parts[sid] = []
-                # (Line note: Append the (message_id, parsed_object) tuple to the session's part list.
-                #  Parts are stored in file order, preserving the original message sequence.
                 text_parts[sid].append((mid, obj))
 
-                # (Line note: Only infer session metadata (title, agent, model) the FIRST time this session ID is seen.
-                #  If the session already exists in `sessions` (e.g. loaded from SQLite earlier), skip metadata inference.
-                #  This ensures SQLite records take precedence over text dump defaults.
                 if sid not in sessions:
-                    # (Line note: Set a fallback title using the first 10 characters of the session ID.
-                    #  sid[:10] safely returns the whole string if it is shorter than 10 characters.
                     title = f"Dump Session ({sid[:10]})"
-                    # (Line note: Default agent for text dump sessions is "build" since no agent metadata is available.
                     agent = "build"
-                    # (Line note: Attempt to infer a meaningful title from the first tool task payload.
-                    #  If the payload contains type="tool" and tool="task", extract the description field.
-                    #  This gives a human-readable title instead of the generic "Dump Session (sid[:10])" fallback.
-                    if obj.get("type") == "tool" and obj.get("tool") == "task":
-                        # (Line note: Safely navigate nested dict keys using .get() with no default.
-                        #  If any key is missing, .get() returns None, and the `or title` falls back to the generic title.
-                        #  Example nested path: obj["state"]["input"]["description"]
-                        title = obj.get("state", {}).get("input", {}).get("description") or title
-                    # (Line note: Create a new SessionInfo object with text-dump defaults.
-                    #  Most fields are left as defaults because text dumps lack rich metadata.
-                    #  db_source_path records which file this session came from for traceability.
+                    parent_id = None
+                    
+                    if isinstance(obj, dict):
+                        parent_id = obj.get("parent_id")
+                        if obj.get("type") == "tool" and obj.get("tool") == "task":
+                            state = obj.get("state")
+                            if isinstance(state, dict):
+                                input_data = state.get("input")
+                                if isinstance(input_data, dict):
+                                    title = input_data.get("description") or title
+
                     sessions[sid] = SessionInfo(
                         id=sid,
                         title=title,
                         agent=agent,
-                        # (Line note: Model is set to "opencode-dump" as a sentinel value indicating
-                        #  this session came from a text dump, not from a live OpenCode session.
                         model="opencode-dump",
                         directory="",
-                        parent_id=None,
+                        parent_id=parent_id,
                         time_created=None,
                         time_updated=None,
                         db_source_path=path,

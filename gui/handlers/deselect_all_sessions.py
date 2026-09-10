@@ -23,10 +23,17 @@ def deselect_all_sessions(window):
     # Step 1: Block signals during batch unchecking to improve processing speed and avoid event spam.
     window.session_table.blockSignals(True)
     # Step 2: Loop through all rows in table and mark column 1 checkbox state as unchecked.
+    if not hasattr(window, "checked_sids"):
+        window.checked_sids = set()
     for r in range(window.session_table.rowCount()):
         item = window.session_table.item(r, 1)
+        title_item = window.session_table.item(r, 4)
         if item:
             item.setCheckState(Qt.CheckState.Unchecked)
+            if title_item:
+                sid = title_item.data(Qt.ItemDataRole.UserRole)
+                if sid:
+                    window.checked_sids.discard(sid)
     # Step 3: Unblock table signals once iteration completes.
     window.session_table.blockSignals(False)
     # Step 4: Refresh selected sessions count summary label and export button text.

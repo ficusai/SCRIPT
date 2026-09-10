@@ -178,8 +178,8 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
 
         # Handle 'write' tool actions that create full file contents.
         if tool == "write":
-            fp = inp.get("filePath") or ""
-            content = inp.get("content") or ""
+            fp = str(inp.get("filePath") or "")
+            content = str(inp.get("content") or "")
             # (Security Note: Path Traversal - The filePath from tool input is used directly without sanitization.
             #  A crafted write call could set filePath to "../../etc/malicious.sh" to write outside the project.
             #  Mitigation: is_script_path() only checks the basename extension; callers should validate the
@@ -208,22 +208,25 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
 
         # Handle 'edit' tool actions that modify existing file content using patches.
         elif tool == "edit":
-            fp = inp.get("filePath") or ""
-            old = inp.get("oldString") or ""
-            new = inp.get("newString") or ""
+            fp = str(inp.get("filePath") or "")
+            old = str(inp.get("oldString") or "")
+            new = str(inp.get("newString") or "")
             if not fp or not is_script_path(fp):
                 continue
             # (Security Note: Path Traversal in edit - filePath is used directly for artifact key and basename
             #  computation. While is_script_path only validates the basename, the full path is stored as
             #  artifact.filePath and later passed to read_disk_content() during backfill. The directory
             #  portion is not checked for ".." traversal. (CWE-22)
-            meta = state.get("metadata") or {}
+            meta = state.get("metadata")
+            meta = meta if isinstance(meta, dict) else {}
             patch = meta.get("diff") or ""
             if not patch:
-                fd = meta.get("filediff") or {}
+                fd = meta.get("filediff")
+                fd = fd if isinstance(fd, dict) else {}
                 patch = fd.get("patch") or ""
             if not patch:
-                patch = f"--- {os.path.basename(fp)}\n+++ {os.path.basename(fp)}\n-{old}\n+{new}\n"
+                base_fp = fp.replace("\\", "/").rsplit("/", 1)[-1]
+                patch = f"--- {base_fp}\n+++ {base_fp}\n-{old}\n+{new}\n"
 
             art = artifacts.get(fp)
             if art is None:
@@ -253,7 +256,7 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
 
         # Handle 'bash' command executions that write or generate script files.
         elif tool == "bash":
-            cmd = inp.get("command") or ""
+            cmd = str(inp.get("command") or "")
             for extracted in parse_bash_artifacts(sid, agent, title, is_sub, ts, cmd, status, db_p):
                 if extracted.filePath not in artifacts:
                     artifacts[extracted.filePath] = extracted

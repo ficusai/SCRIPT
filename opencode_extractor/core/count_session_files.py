@@ -44,44 +44,72 @@ from typing import Dict
 # Testing Steps:
 #   - Call `count_session_files(extractor)`
 #   - Verify returned value is `dict` mapping string session IDs to non-negative integer counts
+from opencode_extractor.core.parse_bash_artifacts import parse_bash_artifacts
+from opencode_extractor.core.parse_part_json import parse_part_json
+from opencode_extractor.utils.is_script_path import is_script_path
+
+
 def count_session_files(extractor) -> Dict[str, int]:
-    # Return the cached count results if they have already been calculated.
-    # Condition: `extractor._file_counts_cache is not None` checks if cached dictionary exists
-    # Output: Dict[str, int] cached map
     if extractor._file_counts_cache is not None:
         return extractor._file_counts_cache
 
-    # Initialize empty dictionary to hold script counts per root session ID
-    # Variable Type: Dict[str, int]
     file_counts: Dict[str, int] = {}
-
-    # Fetch all top-level root sessions from database sources
-    # Variable Type: List[SessionInfo]
-    # (Performance Note: root_sessions() triggers all_sessions() which sorts ALL sessions (including subagents)
-    #  just to filter roots. For large datasets, this is an O(N log N) operation where N is total sessions.
-    #  A dedicated "SELECT * FROM session WHERE parent_id IS NULL" query would be O(N) and avoid the sort.)
     roots = extractor.root_sessions()
+    if not roots:
+        extractor._file_counts_cache = file_counts
+        return file_counts
 
-    # Loop through each root session to extract and count its scripts.
+    sid_to_root: Dict[str, str] = {}
     for r in roots:
+        file_counts[r.id] = 0
         try:
-            # Extract script list for current root session ID
-            # Variable Type: List[ScriptArtifact]
-            # (Performance Note: extract_scripts() is called once per root session. Each call re-parses all part
-            #  JSON rows for that session tree from scratch. With K root sessions each having M parts on average,
-            #  total work is O(K * M). The parsed parts are NOT shared across sessions. Consider a unified parts
-            #  parsing pass that computes counts for all sessions in a single sweep.)
-            scripts = extractor.extract_scripts(r.id)
-            file_counts[r.id] = len(scripts)
+            tree = extractor.root_tree(r.id)
+            for member_id in tree.all_ids:
+                sid_to_root[member_id] = r.id
         except Exception:
-            # If counting fails for a session, set its script count to 0.
-            file_counts[r.id] = 0
+            pass
 
-    # Store the dictionary in the extractor's cache for future calls.
-    # Cache Field: extractor._file_counts_cache
+    all_sids = list(sid_to_root.keys())
+    if not all_sids:
+        extractor._file_counts_cache = file_counts
+        return file_counts
+
+    root_artifacts: Dict[str, set] = {r.id: set() for r in roots}
+
+    try:
+        parts = parse_part_json(extractor.db_sources, extractor._conns, extractor._text_parts, all_sids)
+        for sid, obj in parts:
+            root_id = sid_to_root.get(sid)
+            if not root_id:
+                continue
+            if obj.get("type") != "tool":
+                continue
+            tool = obj.get("tool")
+            state = obj.get("state")
+            state = state if isinstance(state, dict) else {}
+            inp = state.get("input")
+            inp = inp if isinstance(inp, dict) else {}
+
+            if tool in ("write", "edit"):
+                fp = str(inp.get("filePath") or "")
+                if fp and is_script_path(fp):
+                    root_artifacts[root_id].add(fp)
+            elif tool == "bash":
+                cmd = str(inp.get("command") or "")
+                status = str(state.get("status") or "")
+                for extracted in parse_bash_artifacts(sid, "", "", False, None, cmd, status, ""):
+                    root_artifacts[root_id].add(extracted.filePath)
+
+        for root_id, art_set in root_artifacts.items():
+            file_counts[root_id] = len(art_set)
+    except Exception:
+        for r in roots:
+            try:
+                scripts = extractor.extract_scripts(r.id)
+                file_counts[r.id] = len(scripts)
+            except Exception:
+                file_counts[r.id] = 0
+
     extractor._file_counts_cache = file_counts
-
-    # Return completed file counts dictionary
-    # Output: Dict[str, int]
     return file_counts
 

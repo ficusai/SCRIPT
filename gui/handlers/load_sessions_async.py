@@ -29,6 +29,11 @@ from gui.handlers.on_scan_error import on_scan_error
 # - Unreadable database path test: Set window.current_db_path to invalid path "/invalid/path.db"; verify error_signal is emitted and on_scan_error handles it.
 # - Thread execution during window close: Verify background scan_thread terminates gracefully without leaving orphan processes.
 def load_sessions_async(window):
+    # Guard against overlapping scan operations
+    if hasattr(window, "scan_thread") and window.scan_thread is not None:
+        if window.scan_thread.isRunning():
+            return
+
     # Step 1: Update status bar text message at the bottom of the window screen.
     window.status_lbl.setText("Scanning database sessions...")
     # Step 2: Make the loading progress bar element visible to the user.

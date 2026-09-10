@@ -24,16 +24,24 @@ from PyQt6.QtCore import Qt
 # - 1000+ sessions checked (verifies deduplication logic and low memory overhead).
 # - Mixed selection test: 2 checkboxes checked while 3 different rows are highlighted (verifies checkbox selection takes priority over highlighted rows).
 def get_selected_session_ids(window) -> List[str]:
+    if not hasattr(window, "checked_sids"):
+        window.checked_sids = set()
+
     sids = []
     # Step 1: Loop over each row and check if column 1 checkbox is explicitly checked.
     for r in range(window.session_table.rowCount()):
         item1 = window.session_table.item(r, 1)
         title_item = window.session_table.item(r, 4)
-        if item1 and item1.checkState() == Qt.CheckState.Checked:
-            # Extract session ID string stored inside title item's UserRole metadata.
-            sid = title_item.data(Qt.ItemDataRole.UserRole) if title_item else None
-            if sid and sid not in sids:
-                sids.append(sid)
+        if item1 and title_item:
+            sid = title_item.data(Qt.ItemDataRole.UserRole)
+            if sid:
+                if item1.checkState() == Qt.CheckState.Checked:
+                    window.checked_sids.add(sid)
+                else:
+                    window.checked_sids.discard(sid)
+
+    # Add all currently known checked sids to the selection list
+    sids = list(window.checked_sids)
 
     # Step 2: Fallback mechanism - if zero explicit checkboxes were checked, check highlighted rows in table.
     if not sids:

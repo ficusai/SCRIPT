@@ -45,8 +45,6 @@ import re
 #   - echo > file.py (no quoted content between quotes)
 #   - print("hello") > file.py (not an echo command)
 ECHO_REDIRECT_RE = re.compile(
-    # Pattern string: Matches echo followed by quoted text, redirection operator (> or >>), and target filename
-    r"""echo\s+['\"](.*?)['\"]\s*(?:>>|>)\s*['\"]?([^\s'\"|&><]+)['\"]?""",
-    # Flags: MULTILINE (re.M), DOTALL (re.S), IGNORECASE (re.I)
+    r"""echo\s+(?:['\"](.*?)['\"]|([^\n>]+))\s*(?:>>|>)\s*['\"]?([^\s'\"|&><]+)['\"]?""",
     re.M | re.S | re.I,
 )

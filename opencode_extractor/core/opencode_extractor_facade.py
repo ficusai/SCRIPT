@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as _dt
 import os
 import sqlite3
+import threading
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from opencode_extractor.core.connect_sqlite import connect_sqlite
@@ -205,7 +206,8 @@ class OpenCodeExtractor:
             #  If it exists, add it as a single DatabaseSource with kind="sqlite".
             #  WARNING: If you pass a .txt text dump path here, it gets kind="sqlite" and SQL queries will fail silently.
             if not self.db_sources and os.path.isfile(db_path):
-                self.db_sources = [DatabaseSource(label=os.path.basename(db_path), path=db_path, size_mb=0, kind="sqlite")]
+                kind = "text_dump" if db_path.lower().endswith((".txt", ".dump")) else "sqlite"
+                self.db_sources = [DatabaseSource(label=os.path.basename(db_path), path=db_path, size_mb=0, kind=kind)]
         # (Line note: If no sources remain after filtering, raise an error to inform the caller.
         #  This happens when: (a) no databases were discovered AND (b) db_path does not point to an existing file.
         if not self.db_sources:
@@ -220,6 +222,9 @@ class OpenCodeExtractor:
         # (Line note: Lazy-loaded session cache. None means not yet loaded.
         #  First call to all_sessions() or get_session() triggers the actual loading.
         self._sessions: Optional[Dict[str, SessionInfo]] = None
+        self._sorted_sessions: Optional[List[SessionInfo]] = None
+        self._root_sessions_cache: Optional[List[SessionInfo]] = None
+        self._load_lock = threading.Lock()
         # (Line note: Lazy-loaded text dump parts cache. None means not yet created.
         #  Created on first access and shared across all text dump parsing operations.
         self._text_parts: Optional[Dict[str, List[Tuple[str, dict]]]] = None
@@ -322,13 +327,16 @@ class OpenCodeExtractor:
         # (Line note: Early return if sessions are already loaded (cached).
         if self._sessions is not None:
             return
-        # (Line note: Ensure text_parts dict exists before loading sessions.
-        #  load_sessions() mutates this dict in-place when processing text dump sources.
-        if self._text_parts is None:
-            self._text_parts = {}
-        # (Line note: Load all sessions from all configured database sources.
-        #  This populates self._sessions and self._text_parts.
-        self._sessions = load_sessions(self.db_sources, self._conns, self._text_parts)
+        with self._load_lock:
+            if self._sessions is not None:
+                return
+            # (Line note: Ensure text_parts dict exists before loading sessions.
+            #  load_sessions() mutates this dict in-place when processing text dump sources.
+            if self._text_parts is None:
+                self._text_parts = {}
+            # (Line note: Load all sessions from all configured database sources.
+            #  This populates self._sessions and self._text_parts.
+            self._sessions = load_sessions(self.db_sources, self._conns, self._text_parts)
 
     # (Line note: Internal helper to load sessions from a specific text dump file path.
     #  Used by the public API or tests that want to add dump sources after construction.
@@ -371,62 +379,19 @@ class OpenCodeExtractor:
     def all_sessions(self) -> List[SessionInfo]:
         self._load_sessions()
         assert self._sessions is not None
-        # (Line note: Sort sessions by time_created, using datetime.min as fallback for None timestamps.
-        #  This ensures sessions without timestamps sort first (datetime.min is the earliest possible date).
-        return sorted(self._sessions.values(), key=lambda s: s.time_created or _dt.datetime.min)
+        if self._sorted_sessions is None:
+            self._sorted_sessions = sorted(self._sessions.values(), key=lambda s: s.time_created or _dt.datetime.min)
+        return self._sorted_sessions
 
-    # (Line note: Looks up and returns a single SessionInfo record by its unique session ID.
-    #  Returns None (not an exception) if the session ID is not found.
-    #  Triggers lazy session loading if not already loaded.
-    #
-    #  Parameters:
-    #    session_id (str): The unique session identifier string to look up.
-    #      Example: "sess_01HJ89XYZ"
-    #
-    #  Output/effect:
-    #    - Returns SessionInfo if found, None if not found
-    #
-    #  Edge cases & errors:
-    #    - Never raises for a missing session ID; returns None gracefully
-    #    - Case-sensitive matching: "sess_01" and "SESS_01" are different keys
-    # (API Contract Note: get_session(session_id) - Looks up a single session by ID
-    #   Parameters:
-    #     session_id: str - Unique session identifier
-    #   Returns: Optional[SessionInfo] - SessionInfo if found, None if not found
-    #   Raises: Never (returns None for missing IDs)
-    #   Side Effects: Triggers lazy session loading on first call
-    #   Case Sensitivity: Yes - "sess_01" and "SESS_01" are different keys
-    #   Stability: STABLE API)
     def get_session(self, session_id: str) -> Optional[SessionInfo]:
         self._load_sessions()
         assert self._sessions is not None
-        # (Line note: Use dict.get() which returns None for missing keys instead of raising KeyError.
         return self._sessions.get(session_id)
 
-    # (Line note: Returns a list of top-level root sessions, excluding any subagents.
-    #  A root session is defined as one where parent_id is None or empty string (i.e., not a subagent).
-    #  The result is filtered from all_sessions() so it inherits the same chronological sort order.
-    #
-    #  Output/effect:
-    #    - Returns List[SessionInfo] containing only root sessions (parent_id is None)
-    #
-    #  Edge cases & errors:
-    #    - If all sessions are subagents (no roots), returns an empty list
-    #    - Sort order is the same as all_sessions() (chronological, None timestamps first)
-    # (Performance Note: root_sessions() calls all_sessions() which triggers a full sort of all sessions
-    #  just to filter out subagents. For large datasets, this means sorting N sessions when only roots are needed.
-    #  Consider a dedicated query or a cached root_sessions() list to avoid the O(N log N) sort when only
-    #  root sessions are requested.)
-    # (API Contract Note: root_sessions() - Returns top-level sessions (excluding subagents)
-    #   Parameters: None
-    #   Returns: List[SessionInfo] - filtered to parent_id is None, sorted chronologically
-    #   Raises: Never
-    #   Side Effects: Calls all_sessions() which triggers lazy loading
-    #   Stability: STABLE API)
     def root_sessions(self) -> List[SessionInfo]:
-        # (Line note: Filter all sessions to keep only those where is_subagent is False.
-        #  is_subagent is True when parent_id is not None (i.e., the session has a parent).
-        return [s for s in self.all_sessions() if not s.is_subagent]
+        if self._root_sessions_cache is None:
+            self._root_sessions_cache = [s for s in self.all_sessions() if not s.is_subagent]
+        return self._root_sessions_cache
 
     # (Line note: Internal helper to collect all descendant subagent sessions for a given root session ID.
     #  Uses find_descendants() which performs a graph traversal over the parent_id relationships.

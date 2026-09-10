@@ -125,77 +125,46 @@ def load_sessions(
         #  Unknown kinds are silently ignored.)
         if src.kind == "sqlite":
             try:
-                # (Line note: Open or reuse a cached SQLite connection for this database path.
-                #  connect_sqlite() checks self._conns first; if the connection is new, it opens the DB.
-                #  The connection is stored in conns for reuse in future calls.
-                #  Throws: sqlite3.Error if the database is corrupt or inaccessible (caught by except below).)
                 con = connect_sqlite(conns, src.path)
-                # (Line note: Execute a SQL query that selects exactly 8 columns from the session table.
-                #  Columns returned map directly to SessionInfo constructor parameters.
-                #  No WHERE clause -> ALL rows in the session table are selected (both root and subagent sessions).
-                #  No ORDER BY -> rows arrive in SQLite rowid order (physical insertion order).
-                #  No LIMIT -> all sessions are loaded regardless of count.
-                #  Exception: if the table does not exist or the DB is corrupt, the except block catches it.
-                rows = con.execute(
+                cursor = con.execute(
                     "SELECT id, title, agent, model, directory, parent_id, "
                     "time_created, time_updated FROM session"
-                ).fetchall()
-                # (Performance Note: This query does NOT use an index hint. If the 'session' table lacks an index
-                #  on (parent_id, time_created), subagent lookups and sorted queries will perform full table scans.
-                #  Consider ensuring an index exists: CREATE INDEX IF NOT EXISTS idx_session_parent ON session(parent_id);
-                #  Also, fetchall() loads ALL rows into Python memory at once. For databases with >500k sessions,
-                #  use cursor iteration or LIMIT/OFFSET pagination to reduce peak memory.)
-                # (Line note: Iterate over each row returned by the SQL query.
-                #  Each row is a sqlite3.Row object that supports both index and column-name access.
-                for r in rows:
-                    # (Line note: Extract the session ID string from the current row.
-                    #  This is the unique key used for all session lookups.
-                    sid = r["id"]
-                    # (Line note: Deduplication guard - only keep the FIRST occurrence of each session ID.
-                    #  If multiple database sources contain the same session, earlier sources win.
-                    #  This prevents overwriting a richer record with a duplicate from another source.
-                    if sid not in sessions:
-                        # (Line note: Construct a SessionInfo object from the SQL row data.
-                        #  The `or ""` pattern coerces NULL database values to empty strings.
-                        #  The `or None` pattern coerces NULL/empty parent_id to None (meaning "no parent").
-                        #  parse_ts() converts timestamp values (may be REAL seconds or INTEGER milliseconds).
-                        sessions[sid] = SessionInfo(
-                            # (Line note: Unique session identifier string from database.
-                            #  Example: "sess_01HJ89XYZ"
-                            id=sid,
-                            # (Line note: Human-readable session title. Coerced from NULL to "" to avoid None type errors.
-                            #  Example: "Fix authentication bug"
-                            title=r["title"] or "",
-                            # (Line note: Agent persona name used during the session. NULL -> "".
-                            #  Example: "build", "explore", "review"
-                            agent=r["agent"] or "",
-                            # (Line note: AI model name used for this session. NULL -> "".
-                            #  Example: "claude-3-5-sonnet", "gpt-4o"
-                            model=r["model"] or "",
-                            # (Line note: Target working directory path where the session ran commands. NULL -> "".
-                            #  Example: "/home/user/project"
-                            directory=r["directory"] or "",
-                            # (Line note: Parent session ID if this is a subagent, otherwise None for root sessions.
-                            #  The `or None` ensures empty string "" from the DB is treated as "no parent" (root).
-                            #  A non-None value indicates this session was spawned as a subagent of another session.
-                            parent_id=r["parent_id"] or None,
-                            # (Line note: Session creation timestamp, converted from DB format (REAL/INT) to datetime.
-                            #  parse_ts() handles both seconds-since-epoch and milliseconds-since-epoch.
-                            #  NULL or 0 in the database becomes None (unknown creation time).
-                            time_created=parse_ts(r["time_created"]),
-                            # (Line note: Last activity timestamp, same conversion as time_created.
-                            #  NULL or 0 becomes None.
-                            time_updated=parse_ts(r["time_updated"]),
-                            # (Line note: Path to the source database file this record came from.
-                            #  Used for traceability when the same session appears in multiple sources.
-                            db_source_path=src.path,
-                        )
-            # (Line note: Silent failure handler for entire source databases.
-            #  If ANY error occurs while processing a source (corrupt DB, missing table, connection error),
-            #  that source is skipped entirely and the loop continues to the next source.
-            #  This ensures one bad database file does not break loading of all other sources.
+                )
             except Exception:
                 continue
+
+            for r in cursor:
+                try:
+                    row_keys = r.keys() if hasattr(r, "keys") else []
+                    
+                    def get_val(key, default=""):
+                        if key in row_keys:
+                            val = r[key]
+                            return val if val is not None else default
+                        return default
+
+                    sid = get_val("id", None)
+                    if not sid:
+                        continue
+                    sid = str(sid)
+
+                    if sid not in sessions:
+                        parent_id_val = get_val("parent_id", None)
+                        parent_id = str(parent_id_val) if parent_id_val else None
+
+                        sessions[sid] = SessionInfo(
+                            id=sid,
+                            title=str(get_val("title", "")),
+                            agent=str(get_val("agent", "")),
+                            model=str(get_val("model", "")),
+                            directory=str(get_val("directory", "")),
+                            parent_id=parent_id,
+                            time_created=parse_ts(get_val("time_created", None)),
+                            time_updated=parse_ts(get_val("time_updated", None)),
+                            db_source_path=src.path,
+                        )
+                except Exception:
+                    continue
 
         # (Line note: Handle text dump files (plain text with pipe-delimited fields).
         #  Delegates to load_text_dump_sessions() which parses the file and mutates sessions and text_parts in-place.

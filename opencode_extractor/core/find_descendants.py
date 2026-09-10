@@ -48,38 +48,30 @@ from opencode_extractor.models.session_info import SessionInfo
 #   - Call `find_descendants(sessions_dict, "root_id")`
 #   - Verify returned list contains only child `SessionInfo` objects where `parent_id` matches parent hierarchy
 def find_descendants(sessions: Dict[str, SessionInfo], root_id: str) -> List[SessionInfo]:
-    # Initialize output list for descendant SessionInfo objects
-    # Variable Type: List[SessionInfo]
     out: List[SessionInfo] = []
+    if not sessions:
+        return out
 
-    # Initialize traversal stack starting with the root session ID.
-    # Variable Type: List[str]
+    # Pre-build parent_id -> list of child SessionInfo mapping for O(1) lookups
+    children_by_parent: Dict[str, List[SessionInfo]] = {}
+    for sess in sessions.values():
+        if sess.parent_id:
+            children_by_parent.setdefault(sess.parent_id, []).append(sess)
+
     stack = [root_id]
-
-    # Set to record visited session IDs so we do not fall into infinite loops.
-    # Variable Type: Set[str]
     seen: Set[str] = set()
 
-    # Continue graph traversal while stack has unvisited session IDs
     while stack:
         pid = stack.pop()
         if pid in seen:
             continue
         seen.add(pid)
 
-        # Search all session records for any session whose parent ID matches the current ID.
-        # (Performance Note: This inner loop is O(N) per stack pop, making the total
-        #  traversal O(N * D) where N = total sessions and D = tree depth. For a flat
-        #  hierarchy (D=1) this is O(N); for deep nesting it degrades. With 100k sessions
-        #  and depth 10, that's 1M comparisons. Consider pre-building a parent_id->children
-        #  index (HashMap<String, Vec<String>>) at session load time to reduce this to
-        #  O(N + E) where E is the number of parent-child edges.)
-        for sess in sessions.values():
-            if sess.parent_id == pid and sess.id not in seen:
-                out.append(sess)
-                stack.append(sess.id)
+        children = children_by_parent.get(pid, [])
+        for child in children:
+            if child.id not in seen:
+                out.append(child)
+                stack.append(child.id)
 
-    # Return list of discovered descendant sessions
-    # Output: List[SessionInfo]
     return out
 

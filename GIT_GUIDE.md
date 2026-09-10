@@ -24,7 +24,7 @@ This guide explains how Git works in the `OC-SCRIPT-EXTRACTOR` project, how to t
 | Root Scripts | `opencode-script-extractor.sh` | Bash launcher script |
 | Desktop | `opencode-script-extractor.desktop` | Linux desktop shortcut |
 | Core Engine | `opencode_extractor/` | Python library for extraction |
-| GUI | `gui/` | PySide6 desktop interface |
+| GUI | `gui/` | PyQt6 desktop interface |
 | Documentation | `README.md` (optional) | Project documentation |
 
 ### Ignored Files (via .gitignore)

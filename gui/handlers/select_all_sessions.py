@@ -24,10 +24,17 @@ def select_all_sessions(window):
     # Step 1: Block signals so checking multiple table rows doesn't trigger intermediate item changed events.
     window.session_table.blockSignals(True)
     # Step 2: Loop over every table row index and mark column 1 checkbox state as checked.
+    if not hasattr(window, "checked_sids"):
+        window.checked_sids = set()
     for r in range(window.session_table.rowCount()):
         item = window.session_table.item(r, 1)
+        title_item = window.session_table.item(r, 4)
         if item:
             item.setCheckState(Qt.CheckState.Checked)
+            if title_item:
+                sid = title_item.data(Qt.ItemDataRole.UserRole)
+                if sid:
+                    window.checked_sids.add(sid)
     # Step 3: Unblock table signals once iteration completes.
     window.session_table.blockSignals(False)
     # Step 4: Update total count of selected items displayed on the export button and summary labels.

@@ -13,7 +13,7 @@ from typing import Optional
 #
 # Function Parameters:
 #   - path: str (Required) Input file path string to evaluate (e.g. "src/main.py", "scripts/deploy.sh", ".env", "Thumbs.db").
-#   - content: Optional[str] (Optional) File text body content. (Note: Reserved parameter for future shebang/code-marker inspection; currently not read by the function body).
+#   - content: Optional[str] (Optional) File text body content. (Note: Intentionally ignored. We rely on filename/extension checks instead of content heuristics to avoid blocking scripts that lack shebangs or standard markers.)
 # Returns:
 #   - bool: Returns True if the path is considered a valid script/code file, or False if it matches junk, lockfiles, or blank paths.
 #

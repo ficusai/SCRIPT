@@ -42,8 +42,7 @@ import re
 #   Word boundaries ensure "python" matches but "python3" requires explicit inclusion (handled by \w+-\w+).
 #
 # Edge cases:
-#   - Shebang with args: #!/usr/bin/env python3 -u -> matches "python" (word boundary stops at '3')
-#     NOTE: To match "python3" specifically, add "python3" to the alternatives list.
+#   - Shebang with args: #!/usr/bin/env python3 -u -> matches "python3" (python[0-9.]* handles versions)
 #   - Windows shebang: #!C:\Python\python.exe -> matches "python" (path contains ".exe" after word boundary)
 #   - env wrapper: #!/usr/bin/env node -> matches "node"
 #   - Relative path: #!/bin/sh -> matches "sh"

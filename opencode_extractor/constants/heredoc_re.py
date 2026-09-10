@@ -65,9 +65,8 @@ import re
 # Non-matching examples:
 #   - cat << EOF > file.py (redirect after heredoc operator)
 #   - cat > file.py << UNKNOWN (unsupported delimiter tag)
+# Support both cat > file << EOF and cat << EOF > file
 HEREDOC_RE = re.compile(
-    # Pattern string: Matches cat command, redirection path, heredoc marker, body text, and closing delimiter line
-    r"""cat\s+(?:-.*)?>\s*['\"]?([^\s'\"|&><]+)['\"]?\s*<<\s*['\"]?(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)['\"]?(.*?)^\s*(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)\s*$""",
-    # Flags: MULTILINE (re.M), DOTALL (re.S), IGNORECASE (re.I)
+    r"""(?:cat\s+(?:-.*)?>\s*['\"]?([^\s'\"|&><]+)['\"]?\s*<<\s*['\"]?(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)['\"]?(.*?)^\s*(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)\s*$|cat\s+<<\s*['\"]?(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)['\"]?\s*>\s*['\"]?([^\s'\"|&><]+)['\"]?(.*?)^\s*(?:EOF|EOT|SCRIPT|EOF2|CONFIG|FILE)\s*$)""",
     re.M | re.S | re.I,
 )

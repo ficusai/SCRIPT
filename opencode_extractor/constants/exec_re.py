@@ -49,8 +49,6 @@ import re
 #   - vim main.py (vim is not a recognized interpreter)
 #   - echo hello (no script file involved)
 EXEC_RE = re.compile(
-    # Pattern string: Matches interpreter name, optional flags, and script path with whitelisted extension
-    r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-[a-zA-Z]+\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
-    # Flag: IGNORECASE (re.I)
+    r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-\-?[a-zA-Z0-9_-]+(?:\=[^\s'\"]+)?\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
     re.I,
 )

@@ -120,10 +120,12 @@ def extract_tool_calls(extractor, root_session_id: str) -> List[ToolCallArtifact
     for sid, obj in parts:
         if obj.get("type") != "tool":
             continue
-        tool_name = obj.get("tool") or "unknown"
-        state = obj.get("state") or {}
-        status = state.get("status") or ""
-        inp = state.get("input") or {}
+        tool_name = str(obj.get("tool") or "unknown")
+        state = obj.get("state")
+        state = state if isinstance(state, dict) else {}
+        status = str(state.get("status") or "")
+        inp = state.get("input")
+        inp = inp if isinstance(inp, dict) else ({"raw": inp} if inp else {})
         out_val = state.get("output")
 
         # Format complex outputs as readable JSON strings.

@@ -53,7 +53,7 @@ def on_batch_finished(window, sessions_cnt: int, scripts_cnt: int, tools_cnt: in
 
 # ADDITIONAL DOCUMENTATION - FULL CONTRACT
 #
-# Signature: on_batch_finished(window, scripts_cnt: int, tools_cnt: int, out_path: str) -> None
+# Signature: on_batch_finished(window, sessions_cnt: int, scripts_cnt: int, tools_cnt: int, out_path: str) -> None
 #   scripts_cnt: number of script files written (int; may be 0 when export_scripts was unchecked).
 #   tools_cnt:   summed tool-call log entries (int; 0 when export_tool_calls was unchecked).
 #   out_path:    absolute folder path, e.g. "/home/ficus-pro/Desktop/opencode_export_20260910_143000",

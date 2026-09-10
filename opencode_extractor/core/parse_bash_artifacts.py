@@ -148,19 +148,8 @@ def parse_bash_artifacts(
     #  inline script names are non-deterministic across process runs. This is a reproducibility concern,
     #  not a security issue per se, but note that an attacker cannot predict artifact filenames.
     for m in HEREDOC_RE.finditer(cmd + "\n"):
-        # (Line note: Extract and clean the file path from the heredoc match.
-        #  group(1) may be None if the regex captured an empty path, so we use or "" to default to empty string.
-        #  strip() removes surrounding whitespace.
-        #  strip("'\"") removes leading and trailing single or double quotes from the path.
-        #  Example: "  '/tmp/test.py'  " -> "/tmp/test.py"
-        path = (m.group(1) or "").strip().strip("'\"")
-        # (Line note: Extract and clean the heredoc body text.
-        #  group(2) may be None, so default to empty string.
-        #  strip("\n") removes leading and trailing newlines from the body.
-        body = (m.group(2) or "").strip("\n")
-        # (Line note: Validate the extracted path and body before creating an artifact.
-        #  is_script_path(path, body) checks: (a) path has a valid script extension, (b) body is non-empty.
-        #  If any validation fails, skip this match and continue to the next.
+        path = (m.group(1) or m.group(3) or "").strip().strip("'\"")
+        body = (m.group(2) or m.group(4) or "").strip("\n")
         if not path or not body or not is_script_path(path, body):
             continue
         # (Line note: Create a ScriptArtifact for the heredoc-created file.
@@ -197,11 +186,8 @@ def parse_bash_artifacts(
     #  The regex captures: group(1) = echoed content, group(2) = target file path.
     #  Both '>' (overwrite) and '>>' (append) are matched identically.
     for m in ECHO_REDIRECT_RE.finditer(cmd):
-        # (Line note: Extract and clean the echoed content body.
-        body = (m.group(1) or "").strip()
-        # (Line note: Extract and clean the target file path (strip whitespace and quotes).
-        path = (m.group(2) or "").strip().strip("'\"")
-        # (Line note: Validate that both path and body are non-empty and the path is a valid script path.
+        body = (m.group(1) or m.group(2) or "").strip()
+        path = (m.group(3) or "").strip().strip("'\"")
         if not path or not body or not is_script_path(path, body):
             continue
         # (Line note: Create a ScriptArtifact for the echo-created file.

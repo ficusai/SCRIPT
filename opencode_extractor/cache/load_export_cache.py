@@ -202,7 +202,9 @@ def load_export_cache() -> Dict[str, Dict[str, Any]]:
         #    - "exported_sessions" in data: checks that the required key exists
         #  Output: Returns the inner dict mapping session IDs to metadata, or falls through to the except block
         if isinstance(data, dict) and "exported_sessions" in data:
-            return data["exported_sessions"]
+            result = data["exported_sessions"]
+            if isinstance(result, dict):
+                return result
     # (Line note: Catch ALL exceptions from file reading, JSON parsing, or validation.
     #  This broad except ensures the function NEVER raises, always returning a safe fallback.
     #  Caught exceptions include: json.JSONDecodeError, FileNotFoundError, TypeError, KeyError, etc.

@@ -150,4 +150,4 @@ class SessionInfo:
     @property
     def display_title(self) -> str:
         # Line explanation: Strips outer whitespace from title or id; falls back to "(untitled session)" if both are empty
-        return (self.title or self.id or "").strip() or "(untitled session)"
+        return (self.title.strip() or self.id.strip() or "(untitled session)")

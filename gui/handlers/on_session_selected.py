@@ -63,7 +63,9 @@ def on_session_selected(window):
     window.extract_thread.finished_signal.connect(
         lambda scripts, req=current_req: on_scripts_extracted_guarded(window, scripts, req)
     )
-    window.extract_thread.error_signal.connect(lambda err_msg: on_extract_error(window, err_msg))
+    window.extract_thread.error_signal.connect(
+        lambda err_msg, req=current_req: on_extract_error_guarded(window, err_msg, req)
+    )
     window.extract_thread.start()
 
 
@@ -72,6 +74,13 @@ def on_scripts_extracted_guarded(window, scripts, req_id):
     if req_id != window._extract_req_counter:
         return
     on_scripts_extracted(window, scripts)
+
+
+def on_extract_error_guarded(window, err_msg, req_id):
+    """Discard stale extraction errors if a newer session was selected."""
+    if req_id != window._extract_req_counter:
+        return
+    on_extract_error(window, err_msg)
 
 # ADDITIONAL DOCUMENTATION - FULL CONTRACT
 #

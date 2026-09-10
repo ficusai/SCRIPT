@@ -93,9 +93,7 @@ def parse_part_json(
         #  json.JSONDecodeError: raised when data is not valid JSON (e.g. malformed syntax, truncated string).
         #  TypeError: raised when data is None (NULL SQLite column) or not a string/bytes-like object.
         #  In both cases, the entry is skipped and processing continues with the next row.
-        except (json.JSONDecodeError, TypeError):
-            # (Line note: Skip this entry because the JSON is invalid or the data is None.
-            #  No error is raised to the caller; invalid entries are silently filtered out.
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
             continue
         # (Line note: Ensure the parsed JSON root element is a dictionary (object).
         #  This filters out JSON arrays [], strings "", numbers 42, booleans true/false, and null.

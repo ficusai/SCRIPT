@@ -251,62 +251,66 @@ def main() -> None:
     # Variable Type: argparse.Namespace object
     args = ap.parse_args()
 
-    # Discover and display all local OpenCode database files and text dumps found on the machine.
-    print("Discovered OpenCode Database & Dump Sources:")
-    for d in discover_all_databases():
-        print(f"  - [{d.session_count:>4} sessions] [{d.kind}] {d.label}")
-    print()
+    try:
+        # Discover and display all local OpenCode database files and text dumps found on the machine.
+        print("Discovered OpenCode Database & Dump Sources:")
+        for d in discover_all_databases():
+            print(f"  - [{d.session_count:>4} sessions] [{d.kind}] {d.label}")
+        print()
 
-    # Open the extractor facade using the specified database path or all detected databases.
-    # Context manager (`with` statement) automatically handles database connection cleanup
-    with OpenCodeExtractor(args.db) as ex:
-        # Load helper information: counts of files per session and IDs of sessions exported previously.
-        file_counts = ex.get_session_file_counts()
-        exported_ids = load_exported_session_ids()
+        # Open the extractor facade using the specified database path or all detected databases.
+        # Context manager (`with` statement) automatically handles database connection cleanup
+        with OpenCodeExtractor(args.db) as ex:
+            # Load helper information: counts of files per session and IDs of sessions exported previously.
+            file_counts = ex.get_session_file_counts()
+            exported_ids = load_exported_session_ids()
 
-        # If the user asked to list sessions or didn't specify a session, display a summary list and exit.
-        # Condition: `args.list or (not args.session_id and not args.all)`
-        if args.list or (not args.session_id and not args.all):
-            print(f"{'STATUS':<7} {'ID':<34} {'AGENT':<18} {'SUBS':>4} {'SCRIPTS':>7}  TITLE")
-            for s in ex.root_sessions():
-                sc = file_counts.get(s.id, 0)
-                status = "[✓]" if s.id in exported_ids else "[ ]"
-                print(f"{status:<7} {s.id:<34} {s.agent:<18} {s.subagent_count:>4} {sc:>7}  {s.display_title[:60]}")
-            # Exit program with status code 0 cleanly
-            sys.exit(0)
+            # If the user asked to list sessions or didn't specify a session, display a summary list and exit.
+            # Condition: `args.list or (not args.session_id and not args.all)`
+            if args.list or (not args.session_id and not args.all):
+                print(f"{'STATUS':<7} {'ID':<34} {'AGENT':<18} {'SUBS':>4} {'SCRIPTS':>7}  TITLE")
+                for s in ex.root_sessions():
+                    sc = file_counts.get(s.id, 0)
+                    status = "[✓]" if s.id in exported_ids else "[ ]"
+                    print(f"{status:<7} {s.id:<34} {s.agent:<18} {s.subagent_count:>4} {sc:>7}  {s.display_title[:60]}")
+                # Exit program with status code 0 cleanly
+                sys.exit(0)
 
-        # Handle exporting all discovered sessions at once.
-        # Condition: `args.all` is True
-        if args.all:
-            root_sids = [s.id for s in ex.root_sessions()]
-            print(f"Extracting bundles for ALL {len(root_sids)} sessions...")
-            bundles = ex.extract_multiple_bundles(root_sids)
-            if args.out:
-                s_cnt, t_cnt, where = export_session_bundles(
-                    bundles,
-                    args.out,
-                    export_tool_calls=args.tool_calls,
-                    export_scripts_flag=True,
-                    preserve_paths=not args.flat,
-                    create_zip=args.zip,
-                )
-                print(f"\nSuccessfully exported {len(bundles)} sessions ({s_cnt} script files, {t_cnt} tool calls) to: {where}")
-        # Handle exporting a single specific session requested by the user.
-        else:
-            print(f"Extracting data for session {args.session_id} ...")
-            bundle = ex.extract_session_bundle(args.session_id)
-            print(f"Found {len(bundle.scripts)} script artifact(s) and {len(bundle.tool_calls)} tool call(s).")
-            for a in bundle.scripts:
-                n = len(a.content.splitlines()) if a.content else 0
-                print(f"  [{a.label:<16}] {a.filePath}  (from {a.primary_tool}, {n} lines)")
+            # Handle exporting all discovered sessions at once.
+            # Condition: `args.all` is True
+            if args.all:
+                root_sids = [s.id for s in ex.root_sessions()]
+                print(f"Extracting bundles for ALL {len(root_sids)} sessions...")
+                bundles = ex.extract_multiple_bundles(root_sids)
+                if args.out:
+                    s_cnt, t_cnt, where = export_session_bundles(
+                        bundles,
+                        args.out,
+                        export_tool_calls=args.tool_calls,
+                        export_scripts_flag=True,
+                        preserve_paths=not args.flat,
+                        create_zip=args.zip,
+                    )
+                    print(f"\nSuccessfully exported {len(bundles)} sessions ({s_cnt} script files, {t_cnt} tool calls) to: {where}")
+            # Handle exporting a single specific session requested by the user.
+            else:
+                print(f"Extracting data for session {args.session_id} ...")
+                bundle = ex.extract_session_bundle(args.session_id)
+                print(f"Found {len(bundle.scripts)} script artifact(s) and {len(bundle.tool_calls)} tool call(s).")
+                for a in bundle.scripts:
+                    n = len(a.content.splitlines()) if a.content else 0
+                    print(f"  [{a.label:<16}] {a.filePath}  (from {a.primary_tool}, {n} lines)")
 
-            if args.out:
-                s_cnt, t_cnt, where = export_session_bundles(
-                    [bundle],
-                    args.out,
-                    export_tool_calls=args.tool_calls,
-                    export_scripts_flag=True,
-                    preserve_paths=not args.flat,
-                    create_zip=args.zip,
-                )
-                print(f"\nExported session files to: {where}")
+                if args.out:
+                    s_cnt, t_cnt, where = export_session_bundles(
+                        [bundle],
+                        args.out,
+                        export_tool_calls=args.tool_calls,
+                        export_scripts_flag=True,
+                        preserve_paths=not args.flat,
+                        create_zip=args.zip,
+                    )
+                    print(f"\nExported session files to: {where}")
+    except Exception as err:
+        print(f"Error: {err}", file=sys.stderr)
+        sys.exit(1)

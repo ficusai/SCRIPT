@@ -270,6 +270,8 @@ def export_session_bundles(
     #    2. If len(bundles) > 1: auto-generate "opencode_export_all_sessions_<ts>"
     #    3. If len(bundles) == 1: auto-generate "opencode_export_<clean_title>_<ts>"
     #    4. If len(bundles) == 0: auto-generate "opencode_export_<ts>"
+    if folder_name:
+        folder_name = safe_name(folder_name)
     if not folder_name:
         if len(bundles) > 1:
             # (Line note: Multi-bundle mode: use a generic name indicating all sessions are exported.
@@ -320,6 +322,7 @@ def export_session_bundles(
     #  Variable Type: int
     scripts_written = 0
     tool_calls_written = 0
+    exported_sessions_to_mark = []
 
     # (Line note: Define an inner helper function `emit` that writes file content either into the ZIP archive
     #  or directly to the filesystem, depending on which mode is active.
@@ -404,12 +407,8 @@ def export_session_bundles(
         #  sid_short: first 8 characters of the session ID (for compact identification).
         dt_prefix = bundle.session.time_created.strftime("%Y%m%d_%H%M%S") if bundle.session.time_created else "nodate"
         clean_title = safe_name(bundle.session.display_title)
-        sid_short = bundle.session.id[:8]
+        sid_short = safe_name(bundle.session.id[:8])
 
-        # (Line note: Determine the session subfolder name.
-        #  In multi-bundle mode (len(bundles) > 1): use a unique subfolder per session.
-        #  In single-bundle mode (len(bundles) == 1): sess_dir is empty string (no subfolder).
-        #  Subfolder format: "01_20260910_120000_Fix_Bug_sess1234"
         if len(bundles) > 1:
             sess_dir = f"{idx:02d}_{dt_prefix}_{clean_title}_{sid_short}"
         else:
@@ -518,34 +517,31 @@ def export_session_bundles(
                     # (Line note: Emit the patch file content.
                     emit(patch_rel, patch_text)
 
-        # (Line note: Mark this session as exported in the persistent cache.
-        #  This records the session_id, output path, script count, and tool call count
-        #  so that future exports can check if a session has already been processed.
-        #  mark_session_exported() swallows its own write failures, so this never raises.
+        # (Line note: Collect session info to mark as exported in the persistent cache after full success.
+        output_p = str(zip_path) if create_zip else (str(export_target_dir / sess_dir) if sess_dir else str(export_target_dir))
+        exported_sessions_to_mark.append((
+            bundle.session.id,
+            output_p,
+            len(bundle.scripts),
+            len(bundle.tool_calls)
+        ))
+
+    if zf is not None:
+        try:
+            zf.close()
+        except Exception:
+            pass
+        zf = None
+
+    for sid, out_p, sc_cnt, tc_cnt in exported_sessions_to_mark:
         mark_session_exported(
-            session_id=bundle.session.id,
-            # (Line note: Compute the output path for cache tracking.
-            #  In multi-bundle mode: path includes the session subfolder.
-            #  In single-bundle mode: path is just the export target directory.
-            output_path=str(export_target_dir / sess_dir) if sess_dir else str(export_target_dir),
-            script_count=len(bundle.scripts),
-            tool_call_count=len(bundle.tool_calls),
+            session_id=sid,
+            output_path=out_p,
+            script_count=sc_cnt,
+            tool_call_count=tc_cnt,
         )
 
-    # (Line note: Close the ZIP file archive if one was opened.
-    #  This flushes all buffered data and writes the ZIP central directory.
-    #  After closing, the ZIP file is complete and can be extracted.
-    # (Performance Note: ZIP file creation uses ZipFile.writestr() for each entry, which writes entries
-    #  sequentially. For exports with hundreds of script files, consider using a larger buffer or
-    #  pre-compressing content before writing. Also, the ZIP central directory is only written on close(),
-    #  so a power failure mid-write could corrupt the archive. For critical exports, consider writing
-    #  to a temp file first and renaming atomically.)
-    if zf is not None:
-        zf.close()
-        # (Line note: Return the counts and the ZIP file path.
-        #  Output: Tuple[int, int, str] -> (scripts_written, tool_calls_written, zip_file_path)
+    if create_zip:
         return scripts_written, tool_calls_written, str(zip_path)
 
-    # (Line note: Return the counts and the output directory path (for non-ZIP mode).
-    #  Output: Tuple[int, int, str] -> (scripts_written, tool_calls_written, directory_path)
     return scripts_written, tool_calls_written, str(export_target_dir)

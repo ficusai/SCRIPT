@@ -27,7 +27,7 @@
 
 - **Project**: OC-SCRIPT-EXTRACTOR
 - **Location**: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`
-- **Purpose**: PySide6 GUI & Python core library for extracting tool calls, bash scripts, and session artifacts from OpenCode SQLite databases and text dumps.
+- **Purpose**: PyQt6 GUI & Python core library for extracting tool calls, bash scripts, and session artifacts from OpenCode SQLite databases and text dumps.
 - **GitHub**: https://github.com/ficusai/SCRIPT
 
 ---
@@ -44,7 +44,7 @@ OC-SCRIPT-EXTRACTOR/
 │   ├── models/                # Data classes (SessionInfo, ScriptArtifact, etc.)
 │   ├── constants/             # Regex patterns, labels, paths
 │   └── utils/                 # Helpers (file_extension, is_script_path, etc.)
-├── gui/                       # PySide6 desktop application
+├── gui/                       # PyQt6 desktop application
 │   ├── main.py                # QApplication entry point
 │   ├── main_window.py         # Main window class
 │   ├── components/            # UI widget builders
