@@ -30,8 +30,19 @@ def on_batch_error(window, err_msg: str):
     window.export_btn.setEnabled(True)
     window.refresh_btn.setEnabled(True)
     # Step 3: Update status bar text message to report export failure.
+    # (UX Note: The status message "Batch export failed." is technically accurate but lacks detail.
+    #  Users may not understand why it failed. The detailed error is shown in the QMessageBox popup,
+    #  but the status bar could include a brief reason like "Batch export failed: Permission denied"
+    #  to give immediate context without requiring the user to open the dialog.)
     window.status_lbl.setText("Batch export failed.")
     # Step 4: Display modal critical error popup dialog displaying exception text details.
+    # (UX Note: The error dialog title "Export Error" is clear but generic. Consider including the
+    #  error category (e.g., "Export Error: Permission Denied") for faster recognition.
+    #  Also consider showing the first line of the error (not the full traceback) in the title
+    #  for common errors like permission denied or disk full.)
+    # (Accessibility Note: QMessageBox.critical creates a modal dialog that blocks interaction.
+    #  Screen readers will announce the dialog title and message. Ensure the message is concise
+    #  and actionable. Consider including a "What does this mean?" link or tooltip in future versions.)
     QMessageBox.critical(window, "Export Error", f"Batch export failed:\n{err_msg}")
 
 # ADDITIONAL DOCUMENTATION - FULL CONTRACT
