@@ -1,3 +1,8 @@
+# Module note: DB Source Changed Event Handler.
+# Purpose: Updates current database path and triggers an asynchronous rescan when dropdown selection changes.
+# Plain-language overexplanation for beginners:
+# When the user chooses a different database from the top dropdown menu, this handler records the new database path and triggers a scan to reload sessions from that database.
+
 from gui.handlers.load_sessions_async import load_sessions_async
 
 
