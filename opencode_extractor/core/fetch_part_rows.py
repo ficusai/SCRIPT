@@ -1,5 +1,14 @@
 """
 Queries raw message step rows from SQLite databases and text dumps.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .db (SQLite database files), .txt (text dumps)
+- Formats Handled: SQL SELECT query row tuples (session_id, data_str) and text dump JSON payloads
+- Export Modes Supported: High-performance generator iterator streaming database rows
+- Framework Possibilities:
+    - CLI: Streaming raw data layer for session extraction engines
+    - Database Adapters: Multi-engine query router supporting SQLite and flat file dumps
+    - ETL Pipelines: Direct database streaming source for session analytics pipelines
 """
 
 from __future__ import annotations
@@ -46,7 +55,10 @@ from opencode_extractor.models.database_source import DatabaseSource
 # Edge Cases:
 #   - session_ids collection empty: Loop produces 0 SQL queries, yields nothing cleanly without throwing errors.
 #   - A session ID present in BOTH a SQLite DB and a text dump: its rows are yielded twice (once per source).
-#   - Text dump sources with empty text_parts: brade not consulted, nothing yielded for them.
+#   - Text dump sources with empty text_parts: branch not consulted, nothing yielded for them.
+# Testing Steps:
+#   - Consume generator `list(fetch_part_rows(db_sources, conns, text_parts, ["sess_123"]))`
+#   - Verify returned item elements are `(session_id_str, json_data_str)` tuples
 def fetch_part_rows(
     db_sources: List[DatabaseSource],
     conns: Dict[str, sqlite3.Connection],
@@ -54,27 +66,38 @@ def fetch_part_rows(
     session_ids: Iterable[str],
 ):
     # Convert iterable of session IDs to a list.
+    # Variable Type: List[str]
     ids = list(session_ids)
 
     # Process each database source registered in the system.
+    # Iteration Target: db_sources (List[DatabaseSource])
     for src in db_sources:
         if src.kind == "sqlite":
             try:
+                # Open or reuse cached read-only SQLite database connection
                 con = connect_sqlite(conns, src.path)
+
                 # Chunk ID list into batches of 200 to stay well within SQLite SQL variable limits.
+                # Chunk Size: 200 items per SQL query batch
                 for i in range(0, len(ids), 200):
                     chunk = ids[i:i + 200]
                     # Generate dynamic SQL placeholder string (?, ?, ...).
                     ph = ",".join("?" * len(chunk))
+
                     # Execute SQL SELECT statement to fetch matching part table records.
+                    # Yields tuples: (session_id: str, data: str)
                     yield from con.execute(
                         f"SELECT session_id, data FROM part WHERE session_id IN ({ph})", chunk
                     )
             except Exception:
+                # Swallows database read or connection exceptions cleanly
                 continue
+
         elif src.kind == "text_dump" and text_parts:
             # Look up matching session entries from pre-loaded text dump structures.
             for sid in ids:
                 if sid in text_parts:
                     for _mid, obj in text_parts[sid]:
+                        # Re-serialize JSON object to JSON string format to match SQLite row return shape
                         yield (sid, json.dumps(obj))
+
