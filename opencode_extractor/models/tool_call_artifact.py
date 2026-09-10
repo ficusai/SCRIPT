@@ -32,6 +32,21 @@ from typing import Optional
 #   - error: Optional[str] (Optional, default=None) Error text string if tool execution failed, or None if successful.
 #   - db_source_path: str (Optional, default="") Absolute path to database containing tool call record.
 #
+# Data Constraints & Edge Cases:
+#   - call_id uniqueness is NOT guaranteed across sources; duplicates may exist in multi-source loads
+#   - tool_name values are strings with no validation against a known set; valid values include:
+#     "write", "edit", "bash", "read", "glob", "grep", "task", "mcp__<server>__<tool>"
+#   - status values are opaque strings; expected values: "completed", "error", "running", "pending"
+#     but any string is accepted without validation
+#   - input_params is a dict that may contain non-JSON-serializable types (e.g., Path objects) from SQLite
+#   - output and error fields may contain binary data if SQLite stores TEXT with invalid UTF-8
+#   - time field is datetime from parse_ts(); may be None if column is NULL or 0
+#   - is_subagent boolean is set during load; never modified after creation
+# (Data Note: Tool call artifact recording. The input_params dict preserves original types from SQLite,
+#  which may include nested dicts, lists, strings, numbers, and booleans. JSON serialization of this
+#  field may fail if custom objects are present. The output field is raw text; very large outputs
+#  (>1MB) are not truncated and may cause memory pressure during export.)
+#
 # How to Test:
 #   - Run: python3 -c 'from opencode_extractor.models.tool_call_artifact import ToolCallArtifact; t = ToolCallArtifact("c1", "bash", "s1", "build", "Title", False, "completed", None); print(t.tool_name, t.input_params)' (outputs bash {})
 
@@ -39,6 +54,8 @@ from typing import Optional
 @dataclass
 class ToolCallArtifact:
     # Line explanation: Unique identification string for tool call execution step
+    # (Data Note: call_id format is opaque; typically "call_<uuid>" from OpenCode session logs.
+    #  No uniqueness enforcement across multiple database sources; deduplication happens at query time.)
     call_id: str
     
     # Line explanation: Name of invoked tool action ("write", "edit", "bash", "read", "glob", "grep", "task")
