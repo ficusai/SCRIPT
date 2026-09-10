@@ -1,3 +1,8 @@
+# Module note: Scripts Extracted Handler Callback.
+# Purpose: Populates the right panel script list widget with extracted ScriptArtifact items upon completion.
+# Plain-language overexplanation for beginners:
+# When background script extraction finishes for a session, this callback populates the right panel list with checkable script file items and automatically displays the first file's preview.
+
 from PyQt6.QtWidgets import QListWidgetItem
 from PyQt6.QtCore import Qt
 
