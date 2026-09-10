@@ -25,92 +25,109 @@ from opencode_extractor.constants.text_dump_paths import TEXT_DUMP_PATHS
 from opencode_extractor.models.database_source import DatabaseSource
 
 
-# Scans common file system paths for SQLite databases and text dump files containing session history, returning a sorted list of discovered database sources.
-# Returns a list of DatabaseSource objects sorted by total session count descending.
-# SQL Query Behavior & Execution (SQLite sources):
-#   - SQL Query: "SELECT COUNT(*) FROM session"
-#   - Clause-by-clause meaning:
-#       * SELECT COUNT(*) -> returns a single row with one integer = number of rows in the 'session' table.
-#       * FROM session -> reads only the 'session' (conversation metadata) table.
-#       * No WHERE clause -> counts ALL sessions, including subagent sessions (parent_id NOT NULL), not just roots.
-#       * No ORDER BY / no LIMIT -> full table scan; the scalar is read via fetchone()[0].
-#   - Connection mode: Read-only URI ("file:<path>?mode=ro") so the scan never writes to or locks the source.
-#     '?' and '#' inside the path are percent-escaped so they survive URI parsing.
-#   - Failure handling: If the file is not valid SQLite, the 'session' table is missing, the file is locked,
-#     or the connection fails, the broad try/except leaves sess_cnt = 0 and the source is STILL listed (with
-#     a count of 0) instead of being dropped.
-#   - fetchone() returning None (defensive): indexing [0] raises TypeError, also caught -> count stays 0.
-# SQLite source iteration order: for each pattern in DB_CANDIDATE_PATHS (list order), glob output order per pattern.
-# Text Dump Sources (kind="text_dump"):
-#   - Pipe-delimited file format per line: <session_id>|<message_id>|<json_payload>
-#   - Sample line: "sess_123|msg_001|{\"type\":\"tool\",\"tool\":\"write\",\"state\":{...}}"
-#   - Session counting: every line containing "|" contributes line.split("|", 1)[0] (text before the first pipe)
-#     to a uniqueness set; session_count = len(set). The message_id/payload are NOT parsed here.
-#   - This counts ALL unique session IDs in the dump (roots and subagents alike); an empty first field
-#     ("|msg|...") adds "" to the set.
-#   - Reading errors (permission, bad encoding) are swallowed -> source still listed with count 0.
-# Labels: chosen from path heuristics in this priority order:
-#   * contains ".local/share/opencode/opencode.db" -> "Primary Local SSD Database (X.X MB)"
-#   * contains "md.obsidian" -> "Obsidian Flatpak Database (X.X MB)"
-#   * contains "imported_databases" -> "Imported Backup DB: <basename> (X.X MB)"
-#   * contains "/run/media/" -> "External Drive DB (<drive>) (X.X MB)" with drive parsed from the path
-#     ("/run/media/ficus-pro/<drive>/..."), falling back to the literal "External"
-#   * otherwise -> "Database: <basename> (X.X MB)"
-# Deduplication:
-#   - found_paths set prevents the same filesystem path from being listed twice even if multiple glob patterns
-#     match it (e.g. a file caught by both the imported_databases glob and a /run/media glob).
-#   - Paths that exist but are directories are skipped (os.path.isfile check).
-# Final sort:
-#   - results.sort(key=lambda d: -d.session_count) -> DESCENDING session_count.
-#   - Ties keep discovery order (all SQLite sources first in pattern order, then text dumps). No secondary sort key.
-# Return value: List[DatabaseSource]; empty [] when nothing found. Callers that index dbs[0] must handle [].
-# Testing Values & Options:
-#   - Sample paths: "~/.local/share/opencode/opencode.db", "/tmp/imported_databases/backup.db"
-#   - Output kind options: "sqlite" | "text_dump"
-# Edge Cases:
-#   - Corrupted SQLite file or missing 'session' table: OperationalError caught, session count defaults to 0.
-#   - Unreadable text dump file or invalid file encoding: Exception caught, file safely skipped.
-#   - Duplicate path matched by multiple glob patterns: Filtered out using `found_paths` set to prevent double counting.
-#   - Permission denied on /run/media mounts: sqlite3.connect raises -> count stays 0; the source remains listed.
-# Testing Steps:
-#   - Run `from opencode_extractor.discovery.discover_all_databases import discover_all_databases; print(discover_all_databases())`
+# (Line note: This function scans common file system paths for SQLite databases and text dump files
+#  containing OpenCode session history. It returns a sorted list of DatabaseSource objects, ordered
+#  by session count descending (most sessions first).
+#
+#  SQL Query Behavior & Execution (SQLite sources):
+#    - SQL Query used: "SELECT COUNT(*) FROM session"
+#    - Clause-by-clause meaning:
+#        * SELECT COUNT(*) -> returns a single row with one integer = number of rows in the 'session' table.
+#        * FROM session -> reads only the 'session' (conversation metadata) table.
+#        * No WHERE clause -> counts ALL sessions, including subagent sessions (parent_id NOT NULL), not just roots.
+#        * No ORDER BY / no LIMIT -> full table scan; the scalar is read via fetchone()[0].
+#    - Connection mode: Read-only URI ("file:<path>?mode=ro") so the scan never writes to or locks the source database.
+#      '?' and '#' characters inside the path are percent-escaped (%3f and %23) so they survive SQLite URI parsing.
+#    - Failure handling: If the file is not valid SQLite, the 'session' table is missing, the file is locked,
+#      or the connection fails, the broad try/except leaves sess_cnt = 0 and the source is STILL listed (with
+#      a count of 0) instead of being dropped. This ensures potentially useful databases are never silently lost.
+#    - Defensive check: fetchone() returning None (empty result) would cause TypeError on [0] indexing;
+#      this is also caught by the except block, leaving count at 0.
+#
+#  SQLite source iteration order: for each glob pattern in DB_CANDIDATE_PATHS (list order), results from
+#  glob.glob() are processed in the order returned by the OS (typically alphabetical).
+#
+#  Text Dump Sources (kind="text_dump"):
+#    - File format: Pipe-delimited, one JSON payload per line: <session_id>|<message_id>|<json_payload>
+#    - Sample line: "sess_123|msg_001|{\"type\":\"tool\",\"tool\":\"write\",\"state\":{...}}"
+#    - Session counting: every line containing "|" contributes line.split("|", 1)[0] (text before the first pipe)
+#      to a uniqueness set; session_count = len(set). The message_id and payload are NOT parsed here (that happens later).
+#    - This counts ALL unique session IDs in the dump (roots and subagents alike); an empty first field
+#      ("|msg|...") adds "" to the set, which is counted but harmless.
+#    - Reading errors (permission denied, bad encoding) are swallowed -> source is still listed with count 0.
+#
+#  Label generation (human-readable names for each discovered source):
+#    Priority order for label assignment:
+#      1. Path contains ".local/share/opencode/opencode.db" -> "Primary Local SSD Database (X.X MB)"
+#      2. Path contains "md.obsidian" -> "Obsidian Flatpak Database (X.X MB)"
+#      3. Path contains "imported_databases" -> "Imported Backup DB: <basename> (X.X MB)"
+#      4. Path contains "/run/media/" -> "External Drive DB (<drive>) (X.X MB)"
+#         * Drive name is parsed from the path: "/run/media/ficus-pro/<drive>/..." -> <drive>
+#         * Falls back to literal "External" if the parse fails
+#      5. Otherwise -> "Database: <basename> (X.X MB)"
+#
+#  Deduplication:
+#    - found_paths set prevents the same filesystem path from being listed twice even if multiple glob patterns
+#      match it (e.g. a file caught by both the imported_databases glob and a /run/media glob).
+#    - Paths that exist but are directories (not files) are skipped via os.path.isfile() check.
+#
+#  Final sort:
+#    - results.sort(key=lambda d: -d.session_count) -> DESCENDING session_count (most sessions first).
+#    - Ties keep discovery order (all SQLite sources first in pattern order, then text dumps). No secondary sort key.
+#
+#  Return value: List[DatabaseSource]; empty [] when nothing is found. Callers that index dbs[0] must handle [].
+#
+#  How to test:
+#    - Run: from opencode_extractor.discovery.discover_all_databases import discover_all_databases; print(discover_all_databases())
+#    - With no databases on disk: should return []
+#    - With one database: should return a list with one DatabaseSource
+#    - With multiple databases: should return them sorted by session_count descending
+# )
 def discover_all_databases() -> List[DatabaseSource]:
-    # Set to keep track of file paths we have already processed to avoid duplicates.
-    # Variable Type: Set[str]
-    # Default: empty set `set()`
-    # Options: Contains absolute file path strings like "/home/user/.local/share/opencode/opencode.db"
+    # (Line note: Set to keep track of file paths we have already processed to avoid duplicates.
+    #  If two glob patterns match the same file, we only process it once.
+    #  Variable Type: Set[str]
+    #  Default: empty set `set()`
+    #  Contents: Absolute file path strings like "/home/user/.local/share/opencode/opencode.db"
     found_paths: Set[str] = set()
 
-    # List to store information about each database file we discover.
-    # Variable Type: List[DatabaseSource]
-    # Default: empty list `[]`
-    # Options: Holds DatabaseSource dataclass instances
+    # (Line note: List to store information about each database file we discover.
+    #  Each entry is a DatabaseSource dataclass instance.
+    #  Variable Type: List[DatabaseSource]
+    #  Default: empty list `[]`
+    #  Populated as sources are found and appended.
     results: List[DatabaseSource] = []
 
-    # Iterate through potential file paths for SQLite database files.
-    # DB_CANDIDATE_PATHS comes from opencode_extractor.constants.db_candidate_paths
-    # Contains glob patterns targeting SQLite database files across local drives & external mounts
+    # (Line note: Iterate through potential file paths for SQLite database files.
+    #  DB_CANDIDATE_PATHS comes from opencode_extractor.constants.db_candidate_paths.
+    #  It contains glob patterns targeting SQLite database files across local drives and external mounts.
+    #  Example patterns: "~/.local/share/opencode/*.db", "/tmp/imported_databases/**/*.db"
     for pattern in DB_CANDIDATE_PATHS:
-        # Use glob to match wildcard path patterns on disk.
-        # Variable `p`: str absolute file path returned by glob.glob matching `pattern`
+        # (Line note: Use glob to match wildcard path patterns on disk.
+        #  glob.glob(pattern) returns a list of absolute file path strings that match the pattern.
+        #  Variable `p`: str absolute file path returned by glob.glob matching `pattern`
+        #  If no files match, returns an empty list (loop body is skipped).
         for p in glob.glob(pattern):
-            # Verify the path points to an actual file and has not been added yet.
-            # Conditions: os.path.isfile(p) checks regular file status; p not in found_paths checks uniqueness
+            # (Line note: Verify the path points to an actual regular file AND has not been added yet.
+            #  Conditions checked:
+            #    - os.path.isfile(p): True only for regular files (False for directories, symlinks to missing targets)
+            #    - p not in found_paths: prevents duplicate processing if multiple glob patterns match the same file
             if os.path.isfile(p) and p not in found_paths:
-                # Add path to set to prevent duplicate processing if matched by multiple glob rules
+                # (Line note: Add path to the set to prevent duplicate processing if matched by multiple glob rules.
                 found_paths.add(p)
 
-                # Calculate file size in Megabytes (MB).
-                # Formula: bytes / (1024 * 1024) -> float representation in MB (e.g., 14.5)
+                # (Line note: Calculate file size in Megabytes (MB) for the label and metadata.
+                #  Formula: bytes / (1024 * 1024) -> float representation in MB (e.g., 14.5)
+                #  os.path.getsize() returns size in bytes.
                 size_mb = os.path.getsize(p) / (1024 * 1024)
 
-                # Assign a descriptive human-readable label based on where the database file was found.
-                # Label Patterns:
-                #   - Primary SSD: "Primary Local SSD Database (14.5 MB)"
-                #   - Obsidian: "Obsidian Flatpak Database (5.2 MB)"
-                #   - Imported: "Imported Backup DB: backup.db (12.0 MB)"
-                #   - External: "External Drive DB (USB_DRIVE) (8.0 MB)"
-                #   - General: "Database: opencode.db (10.1 MB)"
+                # (Line note: Assign a descriptive human-readable label based on where the database file was found.
+                #  Label Patterns (evaluated in priority order):
+                #    - Primary SSD: "Primary Local SSD Database (14.5 MB)"
+                #    - Obsidian: "Obsidian Flatpak Database (5.2 MB)"
+                #    - Imported: "Imported Backup DB: backup.db (12.0 MB)"
+                #    - External: "External Drive DB (USB_DRIVE) (8.0 MB)"
+                #    - General: "Database: opencode.db (10.1 MB)"
                 if ".local/share/opencode/opencode.db" in p:
                     label = f"Primary Local SSD Database ({size_mb:.1f} MB)"
                 elif "md.obsidian" in p:
@@ -119,62 +136,87 @@ def discover_all_databases() -> List[DatabaseSource]:
                     fn = os.path.basename(p)
                     label = f"Imported Backup DB: {fn} ({size_mb:.1f} MB)"
                 elif "/run/media/" in p:
+                    # (Line note: Parse the drive name from paths like "/run/media/ficus-pro/USB_DRIVE/...".
+                    #  Split on "/run/media/ficus-pro/" and take the first path component as the drive name.
+                    #  If the split fails (unexpected path format), fall back to "External".
                     drive_name = p.split("/run/media/ficus-pro/")[1].split("/")[0] if "/run/media/ficus-pro/" in p else "External"
                     label = f"External Drive DB ({drive_name}) ({size_mb:.1f} MB)"
                 else:
+                    # (Line note: General fallback label for any database not matching the above patterns.
                     label = f"Database: {os.path.basename(p)} ({size_mb:.1f} MB)"
 
-                # Initialize session counter to 0 before querying database
+                # (Line note: Initialize session counter to 0 before attempting to query the database.
+                #  If the query fails, the source is still added with count 0 (rather than being lost).
                 sess_cnt = 0
                 try:
-                    # Open the SQLite database safely in read-only mode using a URI string.
-                    # URI escaping: replaces ? with %3f and # with %23 to avoid breaking SQLite URI parser
+                    # (Line note: Open the SQLite database safely in read-only mode using a URI string.
+                    #  URI escaping: replaces '?' with '%3f' and '#' with '%23' to avoid breaking SQLite's URI parser.
+                    #  The URI format "file:<path>?mode=ro" opens the database in read-only mode, preventing
+                    #  any accidental writes or locks during the discovery scan.
                     uri = "file:" + p.replace("?", "%3f").replace("#", "%23") + "?mode=ro"
                     con = sqlite3.connect(uri, uri=True)
 
-                    # Count how many session records are present in the database.
-                    # SQL Statement: SELECT COUNT(*) FROM session
-                    # Output: Integer scalar representing total row count in session table
+                    # (Line note: Count how many session records are present in the database.
+                    #  SQL Statement: SELECT COUNT(*) FROM session
+                    #  Output: Integer scalar representing total row count in session table
+                    #  fetchone() returns a tuple like (42,), and [0] extracts the integer 42.
                     sess_cnt = con.execute("SELECT COUNT(*) FROM session").fetchone()[0]
 
-                    # Close database connection cleanly
+                    # (Line note: Close the database connection cleanly to release resources.
+                    #  This is important because we may open many databases in a loop.
                     con.close()
                 except Exception:
-                    # If reading the database fails (corrupt file, missing session table, locked DB), leave session count as 0.
+                    # (Line note: If reading the database fails for ANY reason (corrupt file, missing session table,
+                    #  locked DB, permission denied, etc.), leave session count as 0 and continue.
+                    #  The source is still added to results below, so it is not silently lost.
                     pass
 
-                # Store the discovered SQLite database details.
-                # Instance Fields: label (str), path (str), size_mb (float), kind ("sqlite"), session_count (int)
+                # (Line note: Store the discovered SQLite database details as a DatabaseSource object.
+                #  Instance Fields: label (str), path (str), size_mb (float), kind ("sqlite"), session_count (int)
+                #  session_count is included for sorting; the actual data loading happens later via load_sessions().
                 results.append(DatabaseSource(label=label, path=p, size_mb=size_mb, kind="sqlite", session_count=sess_cnt))
 
-    # Iterate through potential file paths for plain text session dumps.
-    # TEXT_DUMP_PATHS comes from opencode_extractor.constants.text_dump_paths
+    # (Line note: Iterate through potential file paths for plain text session dump files.
+    #  TEXT_DUMP_PATHS comes from opencode_extractor.constants.text_dump_paths.
+    #  These patterns target .txt files that contain pipe-delimited session data.
     for pattern in TEXT_DUMP_PATHS:
         for p in glob.glob(pattern):
+            # (Line note: Same file-exists and deduplication checks as for SQLite sources.
             if os.path.isfile(p) and p not in found_paths:
                 found_paths.add(p)
                 size_mb = os.path.getsize(p) / (1024 * 1024)
+                # (Line note: Set to collect unique session IDs from the text dump file.
                 sess_set = set()
                 try:
-                    # Read the text file line by line to collect unique session IDs separated by pipe characters.
-                    # Encoding: utf-8 with errors="replace" for safe reading of corrupted dump files
+                    # (Line note: Read the text file line by line to collect unique session IDs.
+                    #  Encoding: utf-8 with errors="replace" for safe reading of corrupted dump files.
+                    #  Each line is split on the first "|" to extract the session_id portion.
                     with open(p, "r", encoding="utf-8", errors="replace") as f:
                         for line in f:
+                            # (Line note: Only process lines that contain the pipe delimiter.
+                            #  Lines without "|" cannot be parsed as session records.
                             if "|" in line:
-                                # Extract session_id before first pipe character
+                                # (Line note: Extract session_id before the first pipe character.
+                                #  split("|", 1) ensures we only split on the FIRST pipe, preserving
+                                #  any pipe characters that might appear in the message_id or payload.
                                 sess_set.add(line.split("|", 1)[0])
                 except Exception:
+                    # (Line note: If the file cannot be read (permission, encoding error, etc.),
+                    #  skip it but still add the source with count 0.
                     pass
+                # (Line note: Generate a human-readable label for the text dump source.
+                #  Includes the basename, number of unique sessions found, and file size in MB.
                 fn = os.path.basename(p)
                 label = f"Text Dump: {fn} ({len(sess_set)} sessions, {size_mb:.1f} MB)"
 
-                # Store the discovered text dump details.
-                # Kind parameter value: "text_dump"
+                # (Line note: Store the discovered text dump details as a DatabaseSource with kind="text_dump".
+                #  Kind parameter value: "text_dump" (distinguishes from SQLite sources).
                 results.append(DatabaseSource(label=label, path=p, size_mb=size_mb, kind="text_dump", session_count=len(sess_set)))
 
-    # Sort all discovered database sources so the ones with the most sessions appear first.
-    # Sort Key: `-d.session_count` orders list in descending order of session_count
-    # Output: List[DatabaseSource] ordered with largest database first
+    # (Line note: Sort all discovered database sources so the ones with the most sessions appear first.
+    #  Sort Key: `-d.session_count` (negated) orders the list in descending order of session_count.
+    #  Positive session counts come first; sources with count 0 (unreadable/corrupt) come last.
+    #  Output: List[DatabaseSource] ordered with largest database first
+    #  Ties in session_count preserve the original discovery order (stable sort).
     results.sort(key=lambda d: -d.session_count)
     return results
-
