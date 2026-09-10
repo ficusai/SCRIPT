@@ -1,3 +1,8 @@
+# Module note: Filter Sessions Event Handler.
+# Purpose: Filters session rows in the main table based on search query text and dropdown selection.
+# Plain-language overexplanation for beginners:
+# As the user types into the search box or changes the category dropdown filter, this handler runs automatically to hide sessions that do not match the criteria and show only the matching ones.
+
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont
