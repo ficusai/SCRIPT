@@ -55,8 +55,9 @@ import re
 #   7. echo '{"name": "test", "version": "1.0"}' > config.json   -> JSON body with inner double quotes
 #   8. echo "export PATH=$PATH:/usr/local/bin" >> ~/.bashrc      -> path '~/.bashrc'
 #   9. echo "x" > dir/sub/file.sh                -> ('x', 'dir/sub/file.sh') (group2 can hold slashes)
-#  10. echo "hi" 2>err.txt                       -> ('hi', 'err.txt')  - QUIRK: a stderr redirection
-#      is indistinguishable from a file redirect, so this is falsely reported as writing 'err.txt'.
+#  10. echo "hi" 2>err.txt                       -> NO MATCH (verified). The '2' between the closing
+#      quote and '>' breaks the whitespace-bridge `\s*(?:>>|>)`, so a stderr redirect '2>' is
+#      cleanly ignored (unlike what an older version of this comment incorrectly claimed).
 #
 # ============================================================================
 # VERIFIED NON-MATCH EXAMPLES (why each fails)

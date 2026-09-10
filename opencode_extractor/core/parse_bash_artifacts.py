@@ -20,7 +20,8 @@ from opencode_extractor.utils.is_script_path import is_script_path
 
 # Scans terminal command strings to detect and extract script files created via heredocs, echo redirects, script executions, or inline Python scripts.
 # Pattern Matching & Extraction Rules:
-#   1. Heredoc Regex (HEREDOC_RE): Matches commands like "cat << 'EOF' > file.py\ncontent\nEOF", extracting file path and body text.
+#   1. Heredoc Regex (HEREDOC_RE): Matches commands in the order "cat > file.py << 'EOF'\ncontent\nEOF",
+#      extracting file path and body text. NOTE: the "cat << 'EOF' > file.py" order does NOT match.
 #      source_kind = "bash_heredoc". Body gets a trailing newline appended. Quotes around path/delimiter are stripped.
 #      A heredoc without its closing marker is not matched at all.
 #   2. Echo Redirect Regex (ECHO_REDIRECT_RE): Matches commands like "echo 'content' > file.py", extracting inline body and target path.
@@ -51,7 +52,7 @@ from opencode_extractor.utils.is_script_path import is_script_path
 # Exception & Failure Behavior:
 #   - Cannot raise on malformed commands: regexes are safe, and read_disk_content returns "" instead of raising.
 # Sample Terminal Command Patterns for Testing:
-#   1. Heredoc: "cat << 'EOF' > /tmp/test.py\nprint('hello')\nEOF" -> source_kind="bash_heredoc"
+#   1. Heredoc: "cat > /tmp/test.py << 'EOF'\nprint('hello')\nEOF" -> source_kind="bash_heredoc"
 #   2. Echo Redirect: "echo 'import os' > script.py" -> source_kind="bash_echo"
 #   3. Script Execution: "python3 /path/to/app.py" -> source_kind="bash_exec"
 #   4. Inline Python: "python3 -c 'import sys; print(sys.version)'" -> source_kind="bash_inline", name="inline_script_<hash>.py"
