@@ -18,6 +18,13 @@ Import behavior: importing this file (e.g. `import gui.__main__`) only patches s
 Failure cases:
   - Missing PyQt6: `ModuleNotFoundError: No module named 'PyQt6.QtWidgets'` at the gui.main import line.
   - Missing display: Qt raises `QSocketNotifier`/`Could not connect to display` unless offscreen platform is used.
+
+# (DevOps Note: This file has no CI entrypoint. There is no tox.ini, pytest.ini, or GitHub Actions workflow.
+#  Headless testing requires manual invocation with QT_QPA_PLATFORM=offscreen.
+#  Consider adding a tests/ directory with pytest fixtures and a GitHub Actions CI workflow for regression testing.)
+
+# (DevOps Note: No application upgrade / migration path is implemented. If CACHE_FILE schema changes between
+#  releases, old cache entries become silently invalid. Document a migration guide in README.md for version bumps.)
 """
 
 # Line note: Import system tools to work with Python paths and file system locations.
