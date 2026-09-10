@@ -66,7 +66,7 @@ def build_header_bar(window) -> QHBoxLayout:
     # Line note: Create large bold title label showing the main application name.
     # Title styling layout: 16pt bold font rendered in Catppuccin text theme (#cdd6f4).
     # Tester note: 16pt is large; try setPointSize(12) for a compact bar or 20 for a very large banner.
-    title_lbl = QLabel("OpenCode Session Script Extractor")
+    title_lbl = QLabel("SCRIPT by FICUS (ficusai)")
     title_font = QFont()
     title_font.setPointSize(16)
     title_font.setBold(True)

@@ -5,10 +5,10 @@
 # It sets window dimensions (1200x780 pixels), applies the dark theme stylesheet, holds global application state variables, assembles the header, table, preview pane, export settings bar, and status footer, and launches initial database scanning.
 
 # Line note: Import python type hint helpers for lists and optional values.
+import os
 from typing import List, Optional
-# Line note: Import core Qt constants such as alignment and orientation flags.
 from PyQt6.QtCore import Qt
-# Line note: Import PyQt6 user interface components for windows, layouts, containers, and split view panes.
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QSplitter
 # Line note: Import function to check which session IDs have already been exported previously.
 from opencode_extractor import load_exported_session_ids
@@ -92,33 +92,19 @@ class MainWindow(QMainWindow):
     # Layout settings: Sets 1200px width and 780px height; applies DARK_STYLESHEET CSS styling rules.
     # Side effect note: __init__ ALREADY kicks off load_sessions_async(self), so a background scan starts running
     # on the very first ScanWorker thread before this constructor returns.
-    def __init__(self):
+    def __init__(self, initial_db_path: str = "all"):
         # Line note: Initialize parent QMainWindow properties.
         super().__init__()
-        # Line note: Set the window title shown in the operating system taskbar and window header bar.
-        # Tester note: change the string to verify taskbar/title bar updates; e.g. "OpenCode (debug)".
-        self.setWindowTitle("OpenCode Session Script Extractor (Multi-DB)")
-        # Line note: Set default window dimensions (width: 1200 pixels, height: 780 pixels).
-        # Layout dimensions: Window is resizable; minimum recommended resolution is 1024x600 pixels.
-        # Tester options: resize(1400, 900) for a bigger default; resize(1024, 600) to test the smallest usable size.
-        # To enforce a hard minimum instead of a suggestion, call self.setMinimumSize(1024, 600) right here.
-        # (UX Note: No minimum size is enforced. On low-resolution screens (<1024x600), the UI may become unusable
-        #  with truncated text and overlapping widgets. Consider adding self.setMinimumSize(1024, 600) to prevent
-        #  this. Also consider storing the last window geometry in QSettings for persistence across restarts.)
+        self.setWindowTitle("SCRIPT by FICUS (ficusai)")
         self.resize(1200, 780)
-        # Line note: Apply the dark stylesheet colors across all window components.
-        # Styling parameter: DARK_STYLESHEET contains dark background (#1e1e2e) and blue accent palette (#89b4fa).
-        # Tester note: pass "" to restore native theme; pass a custom QSS string to restyle the whole app.
         self.setStyleSheet(DARK_STYLESHEET)
 
-        # Line note: Store detected database source paths across the computer.
-        # Valid state value: List of DatabaseSource objects containing SQLite DB file paths (e.g. `~/.config/opencode/opencode.db`) or text dump paths.
-        # Populated by on_sessions_loaded after each successful scan.
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "opencode-script-extractor.svg")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
         self.db_sources: List[DatabaseSource] = []
-        # Line note: Store currently selected database filter ("all" combines all databases).
-        # Valid option choices: "all" (unified combined view) or specific file path string.
-        # Updated by on_db_source_changed when the user switches the dropdown.
-        self.current_db_path: str = "all"
+        self.current_db_path: str = initial_db_path
         # Line note: Store ID of the session currently selected by the user in the table.
         # Valid state value: Session UUID string (e.g. "ses_01h8x2k3...") or None if no session selected.
         # Written by on_session_selected; the duplicate-selection guard compares against it.
