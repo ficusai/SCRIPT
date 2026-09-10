@@ -149,10 +149,13 @@ def fetch_part_rows(
                 continue
 
         elif src.kind == "text_dump" and text_parts:
-            # Look up matching session entries from pre-loaded text dump structures.
+            # (Performance Note: Linear scan `if sid in text_parts` inside the outer loop makes this branch
+            #  O(K * T) where K = len(session_ids) and T = number of text_dump sessions. Since dict key lookup
+            #  is O(1) amortized, the effective complexity is O(K). However, the inner loop iterates over ALL
+            #  text dump entries for each matching sid, which can be expensive if a single session has millions
+            #  of parts. Consider adding a parts-per-session count limit or pagination.)
             for sid in ids:
                 if sid in text_parts:
                     for _mid, obj in text_parts[sid]:
-                        # Re-serialize JSON object to JSON string format to match SQLite row return shape
                         yield (sid, json.dumps(obj))
 
