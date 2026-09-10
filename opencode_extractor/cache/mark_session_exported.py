@@ -115,6 +115,21 @@ def mark_session_exported(
     #  Returns {} (empty dict) if the cache file is missing or corrupted.
     cache = load_export_cache()
 
+    # (Security Note: Race Condition on Cache File - This function performs a read-modify-write cycle:
+    #  it loads the existing cache, updates one entry, and writes the entire dictionary back.
+    #  Two concurrent calls (e.g., two batch exports running simultaneously) can interleave:
+    #    Thread A reads cache -> Thread B reads cache -> Thread A writes cache (loses B's prior state)
+    #  -> Thread B writes cache (overwrites A's update).
+    #  The atomic tmp+replace prevents FILE CORRUPTION but does NOT prevent DATA LOSS of concurrent updates.
+    #  (CWE-362: Concurrent Execution using Shared Resource with Improper Synchronization)
+    #
+    # (Security Note: Hardcoded Cache Path - CACHE_FILE resolves to ~/.local/share/opencode/export_cache.json.
+    #  This path is world-readable by default. Session export metadata (session IDs, output paths) stored
+    #  here is accessible to any user on the system. Consider restricting file permissions to 0600 after write.)
+    #
+    # (Security Note: No Input Validation on output_path - The output_path parameter is stored verbatim
+    #  without sanitization. If this value comes from user input or an untrusted source, it could contain
+    #  arbitrary strings. Currently safe since it's only metadata, but document this assumption.)
     # (Line note: Store or update the session entry in the cache with current details and timestamp.
     #  Dictionary Key: Normalized string session_id (whitespace-stripped)
     #  Dictionary Value Dict Keys (metadata per session):
