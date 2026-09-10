@@ -187,3 +187,27 @@ class BatchExportWorker(QThread):
 #   - Full disk (tmpfs mount of 1 MB, export large files) -> OSError [Errno 28] dialog.
 #   - Unknown session ID in the list -> KeyError dialog; already-saved earlier bundles remain on disk.
 #   - 100+ sessions -> progress bar increments 1..100 without stalling; window stays responsive.
+# (Test Note: Missing test suite — add pytest-qt tests for:
+#   1. Empty session_ids: batch_thread.session_ids=[] -> progress_signal(0,0,"Writing...") then finished_signal(0,0,path).
+#   2. Single valid session: verify finished_signal emitted with correct (scripts_cnt, tool_calls_cnt, out_path).
+#   3. KeyError on unknown session: verify error_signal emitted, not swallowed silently.
+#   4. Progress signal sequence: for N sessions, exactly N+1 progress_signal emissions (N per-session + 1 final).
+#   5. Multi-session with mixed success/failure: one KeyError -> error_signal fired, earlier bundles still on disk.
+#   6. ZIP mode: create_zip=True -> finished_signal.out_path ends ".zip", verify ZIP is valid on extraction.
+#   7. Disk full simulation: mount tmpfs 1MB, export large bundle -> OSError caught, error_signal emitted.
+#   8. Thread safety: verify no Qt widget access from run() method; all UI updates via signals only.
+#   9. Context manager: verify OpenCodeExtractor closed after run() completes (connections released).
+#   10. Consecutive exports: run two BatchExportWorkers sequentially, verify second uses fresh extractor instance.
+#   Isolated test:
+#   ```python
+#   from gui.workers.batch_export_worker import BatchExportWorker
+#   from PyQt6.QtCore import QCoreApplication
+#   import sys
+#   app = QCoreApplication(sys.argv)
+#   worker = BatchExportWorker(session_ids=[], dest_dir="/tmp/test_export")
+#   finished = []
+#   worker.finished_signal.connect(lambda s,t,p: finished.append((s,t,p)))
+#   worker.start(); app.exec()
+#   assert len(finished) == 1 and finished[0][0] == 0
+#   ```
+# )
