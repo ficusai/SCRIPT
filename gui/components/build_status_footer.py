@@ -55,6 +55,11 @@ def build_status_footer(window) -> QHBoxLayout:
     footer_layout = QHBoxLayout()
     # Line note: Create status label to display current state messages (e.g. "Ready", "Scanning...", "Exporting...").
     # Label target: `window.status_lbl` text updated dynamically by background threads and user actions.
+    # (UX Note: The status label is the primary feedback mechanism for all background operations.
+    #  Users should always be able to see what the app is doing. Ensure all async operations update
+    #  this label with clear, human-readable messages.)
+    # (Accessibility Note: Screen reader users may not notice status changes if focus is elsewhere.
+    #  Consider using QMessageBox for important status updates, or adding an audible cue for errors.)
     window.status_lbl = QLabel("Ready")
     footer_layout.addWidget(window.status_lbl)
     # Stretch behavior: the empty gap before the progress bar pins the bar to the right corner.
@@ -62,10 +67,17 @@ def build_status_footer(window) -> QHBoxLayout:
 
     # Line note: Create progress indicator bar for showing background task completion percentage (hidden by default).
     # Layout parameter: Fixed width 200px; Hidden by default until worker thread starts.
+    # (UX Note: The progress bar is hidden (setVisible(False)) during idle state. This is correct -
+    #  users don't need to see a 0% bar when nothing is happening. However, consider showing a subtle
+    #  "idle" indicator or spinner when scanning starts to confirm the app hasn't frozen.)
+    # (Accessibility Note: QProgressBar supports the "progressbar" role automatically. Screen readers
+    #  will announce percentage values. Ensure the setFormat includes "%v/%m" or "%p%" for clear announcements.)
     window.progress_bar = QProgressBar()
     window.progress_bar.setFixedWidth(200)
     window.progress_bar.setVisible(False)
     footer_layout.addWidget(window.progress_bar)
-    
+
+    # (Empty State Note: When no operation is running, both status_lbl shows "Ready" and progress_bar is hidden.
+    #  This is the correct idle state. No changes needed here.)
     # Line note: Return completed footer layout.
     return footer_layout
