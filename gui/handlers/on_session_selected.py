@@ -1,3 +1,8 @@
+# Module note: Session Selection Event Handler.
+# Purpose: Triggers background script extraction for a highlighted session table row.
+# Plain-language overexplanation for beginners:
+# When the user clicks a session row in the left table, this handler starts a background ExtractWorker thread to read all script files contained in that session.
+
 from PyQt6.QtCore import Qt
 from gui.workers.extract_worker import ExtractWorker
 from gui.handlers.on_scripts_extracted import on_scripts_extracted
