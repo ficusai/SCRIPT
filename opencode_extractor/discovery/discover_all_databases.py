@@ -102,6 +102,9 @@ def discover_all_databases() -> List[DatabaseSource]:
     #  DB_CANDIDATE_PATHS comes from opencode_extractor.constants.db_candidate_paths.
     #  It contains glob patterns targeting SQLite database files across local drives and external mounts.
     #  Example patterns: "~/.local/share/opencode/*.db", "/tmp/imported_databases/**/*.db"
+    # (Performance Note: glob.glob() is called for EACH pattern in DB_CANDIDATE_PATHS sequentially. If the
+    #  patterns target network mounts or slow USB drives, each glob can take seconds. Consider parallelizing
+    #  glob calls with concurrent.futures.ThreadPoolExecutor, especially when scanning multiple mount points.)
     for pattern in DB_CANDIDATE_PATHS:
         # (Line note: Use glob to match wildcard path patterns on disk.
         #  glob.glob(pattern) returns a list of absolute file path strings that match the pattern.
@@ -160,6 +163,11 @@ def discover_all_databases() -> List[DatabaseSource]:
                     #  SQL Statement: SELECT COUNT(*) FROM session
                     #  Output: Integer scalar representing total row count in session table
                     #  fetchone() returns a tuple like (42,), and [0] extracts the integer 42.
+                    # (Performance Note: COUNT(*) on a large table without an covering index requires a full table
+                    #  or index scan. Ensure the 'session' table has a primary key on 'id' (which SQLite creates
+                    #  implicitly) — COUNT(*) can then use the pk index. For very large tables (>1M rows), this
+                    #  query is still fast but not free. Consider caching the count in a separate metadata table
+                    #  that gets updated on session write, avoiding the need to COUNT on every discovery.)
                     sess_cnt = con.execute("SELECT COUNT(*) FROM session").fetchone()[0]
 
                     # (Line note: Close the database connection cleanly to release resources.
@@ -191,6 +199,11 @@ def discover_all_databases() -> List[DatabaseSource]:
                     # (Line note: Read the text file line by line to collect unique session IDs.
                     #  Encoding: utf-8 with errors="replace" for safe reading of corrupted dump files.
                     #  Each line is split on the first "|" to extract the session_id portion.
+                    # (Performance Note: Text dump files are read line-by-line which is memory-efficient for the
+                    #  file stream, but a set() is built for ALL unique session IDs. For very large dumps (>10M
+                    #  lines), this set can consume significant RAM. Also, json.dumps() is called later in
+                    #  fetch_part_rows for each row — consider whether the re-serialization is necessary or if
+                    #  the raw dict could be passed directly to downstream consumers.)
                     with open(p, "r", encoding="utf-8", errors="replace") as f:
                         for line in f:
                             # (Line note: Only process lines that contain the pipe delimiter.
