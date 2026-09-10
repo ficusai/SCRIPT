@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 # Line note: Locate the root folder of the project so Python can find all internal package files.
-# Path resolution: Path(__file__).resolve().parent.parent calculates absolute path to `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR`.
+# Path resolution: Path(__file__).resolve().parent.parent calculates absolute path to the project root.
 # Test note: works for both `python3 -m gui` and `python3 gui/__main__.py` because it derives from __file__.
 root_dir = Path(__file__).resolve().parent.parent
 # Line note: Add the project root folder to Python's module search paths if it is not already included.

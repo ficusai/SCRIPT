@@ -35,7 +35,7 @@ from typing import Dict
 #   - Path already exists in `conns` dict -> Returns cached connection directly without reopening, saving memory and handle resources.
 #   - Connections opened here are never closed inside this function; callers own them (OpenCodeExtractor.close()).
 # Testing Values & Examples:
-#   - Standard path: "/home/ficus-pro/.local/share/opencode/opencode.db"
+#   - Standard path: "~/.local/share/opencode/opencode.db"
 #   - Path with special characters: "/tmp/db_test#1?query.db" -> Escaped to "file:/tmp/db_test%231%3fquery.db?mode=ro"
 # Edge Cases:
 #   - Same path requested twice -> the SAME connection object identity is returned both times (no duplicate handles).

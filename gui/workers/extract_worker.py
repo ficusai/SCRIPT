@@ -19,7 +19,7 @@ from opencode_extractor import OpenCodeExtractor
 #
 # Valid parameters & test options:
 # - session_id: String session identifier, e.g. "ses_12345678", "ses_abc987", or "ses_00000000".
-# - db_path: "all" or absolute path string e.g. "/home/ficus-pro/.config/opencode/opencode.db".
+# - db_path: "all" or absolute path string e.g. "~/.config/opencode/opencode.db".
 #
 # Signal payloads emitted:
 # - finished_signal: list[ScriptArtifact]

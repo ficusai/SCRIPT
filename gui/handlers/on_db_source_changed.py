@@ -11,7 +11,7 @@ from gui.handlers.load_sessions_async import load_sessions_async
 #
 # ComboBox Data Values & current_db_path Choices:
 # - "all": Aggregates root sessions across all discovered SQLite databases on the system.
-# - Absolute file path string: e.g. "/home/ficus-pro/.config/opencode/opencode.db", "/tmp/test.db".
+# - Absolute file path string: e.g. "~/.config/opencode/opencode.db", "/tmp/test.db".
 #
 # Operation Flow & Async Execution:
 # 1. Reads currentIndex() from window.db_combo.
@@ -43,7 +43,7 @@ def on_db_source_changed(window):
 #
 # Valid combo userData values (set by on_sessions_loaded):
 #   - "all"                       -> unified view over every discovered source.
-#   - absolute path string        -> e.g. "/home/ficus-pro/.config/opencode/opencode.db",
+#   - absolute path string        -> e.g. "~/.config/opencode/opencode.db",
 #                                    "/tmp/test.db", or a ".txt" text-dump path.
 #   - None (transient during clear) -> current_db_path becomes None; OpenCodeExtractor then treats
 #                                    None as "all" (unified scan) - a safe graceful degradation.

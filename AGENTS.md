@@ -2,7 +2,7 @@
 
 ## 🚨 MANDATORY RULE: AUTOMATIC LOCAL GIT COMMITS & STRICT REPOSITORY BOUNDARY (NO EXCEPTIONS)
 
-1. **Repository Boundary**: This Git repository (`.git`) is strictly isolated to `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`. Commits and tracking MUST ONLY include files within `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`.
+1. **Repository Boundary**: This Git repository (`.git`) is strictly isolated to the project root directory. Commits and tracking MUST ONLY include files within the project root.
    - `.git`
    - `.gitignore`
    - `AGENTS.md`
@@ -11,8 +11,8 @@
    - `opencode_extractor/`
    - `opencode-script-extractor.desktop`
    - `opencode-script-extractor.sh`
-   *(Note: `__pycache__` directories and `.pyc` files are explicitly excluded via `.gitignore`).* No external directories or files outside `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/` may ever be committed.
-2. **Automatic Local Commits**: Whenever ANY AI agent or automated script creates, modifies, refactors, or deletes a file within `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`, it MUST immediately commit the change to local Git.
+   *(Note: `__pycache__` directories and `.pyc` files are explicitly excluded via `.gitignore`).* No external directories or files outside the project root may ever be committed.
+2. **Automatic Local Commits**: Whenever ANY AI agent or automated script creates, modifies, refactors, or deletes a file within the project root, it MUST immediately commit the change to local Git.
 
 ### Mandatory Post-Edit Execution Sequence:
 1. **Verification**: Verify that the file edits pass basic syntax or test checks (if applicable).
@@ -26,7 +26,7 @@
 ## Project Overview
 
 - **Project**: OC-SCRIPT-EXTRACTOR
-- **Location**: `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`
+- **Location**: Project root directory
 - **Purpose**: PyQt6 GUI & Python core library for extracting tool calls, bash scripts, and session artifacts from OpenCode SQLite databases and text dumps.
 - **GitHub**: https://github.com/ficusai/SCRIPT
 
@@ -151,7 +151,7 @@ python3 -m gui
 ```bash
 # Launch via desktop file
 gtk-launch opencode-script-extractor
-# Or double-click /home/ficus-pro/Desktop/opencode-script-extractor.desktop
+# Or double-click the desktop shortcut (installed via install_desktop.sh)
 ```
 
 ---

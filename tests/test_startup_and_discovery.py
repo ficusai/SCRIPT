@@ -18,18 +18,21 @@ def qapp():
 
 def test_db_candidate_paths_no_hardcoded_user():
     """Ensure candidate paths definition file does not contain hardcoded usernames."""
+    import re
     import inspect
     import opencode_extractor.constants.db_candidate_paths as db_mod
     src = inspect.getsource(db_mod)
-    assert "/home/ficus-pro" not in src, "Hardcoded user found in db_candidate_paths source code"
+    # Allow /home/ in expanduser("~/.local/...") but reject /home/<specific-user>/ in path literals
+    assert not re.search(r"/home/(?!~)[a-zA-Z0-9._-]+/", src), "Hardcoded user found in db_candidate_paths source code"
 
 
 def test_text_dump_paths_no_hardcoded_user():
     """Ensure text dump paths definition file does not contain hardcoded usernames."""
+    import re
     import inspect
     import opencode_extractor.constants.text_dump_paths as txt_mod
     src = inspect.getsource(txt_mod)
-    assert "/home/ficus-pro" not in src, "Hardcoded user found in text_dump_paths source code"
+    assert not re.search(r"/home/(?!~)[a-zA-Z0-9._-]+/", src), "Hardcoded user found in text_dump_paths source code"
 
 
 def test_discover_all_databases_returns_list():

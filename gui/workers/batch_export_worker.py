@@ -22,7 +22,7 @@ from opencode_extractor import OpenCodeExtractor, export_session_bundles
 #
 # Valid parameters & export configuration choices:
 # - session_ids: list[str] e.g. ["ses_12345678", "ses_87654321"], or empty list [].
-# - dest_dir: Valid output folder path string e.g. "/home/ficus-pro/Desktop", "/tmp/exports".
+# - dest_dir: Valid output folder path string e.g. "~/Desktop", "/tmp/exports".
 # - export options (booleans): export_tool_calls, export_scripts, preserve_paths, create_zip, write_patches, create_subfolder.
 # - export format choices represented by flag combos: "scripts" (scripts=True, tool_calls=False), "bundles" (scripts=False, tool_calls=True), "both" (scripts=True, tool_calls=True).
 # - db_path: "all" or specific SQLite path string.

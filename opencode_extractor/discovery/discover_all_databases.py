@@ -62,7 +62,7 @@ from opencode_extractor.models.database_source import DatabaseSource
 #      2. Path contains "md.obsidian" -> "Obsidian Flatpak Database (X.X MB)"
 #      3. Path contains "imported_databases" -> "Imported Backup DB: <basename> (X.X MB)"
 #      4. Path contains "/run/media/" -> "External Drive DB (<drive>) (X.X MB)"
-#         * Drive name is parsed from the path: "/run/media/ficus-pro/<drive>/..." -> <drive>
+#         * Drive name is parsed from the path: "/run/media/<user>/<drive>/..." -> <drive>
 #         * Falls back to literal "External" if the parse fails
 #      5. Otherwise -> "Database: <basename> (X.X MB)"
 #
@@ -97,10 +97,9 @@ from opencode_extractor.models.database_source import DatabaseSource
 #  targets 3.11+ so this is not a concern, but note that `recursive=True` is the default
 #  behavior for `**` patterns in Python 3.11+.
 #
-#  (Compat Note: The drive name parsing `p.split("/run/media/ficus-pro/")[1].split("/")[0]`
-#  hardcodes the current username "ficus-pro". On other systems, this split will fail and
-#  the label will show "External" as fallback. A more portable approach would use
-#  `os.environ.get('USER')` or `pathlib.Path.home().name`.
+#  (Compat Note: The drive name parsing dynamically detects the mount prefix
+#  (/run/media/, /media/, /mnt/) and splits on it to extract the drive name.
+#  Falls back to "External" if the parse fails.
 #
 #  (Compat Note: SQLite COUNT(*) query behavior is consistent across SQLite versions 3.x.
 #  However, the `session` table schema is assumed to exist. If OpenCode changes its database

@@ -8,7 +8,7 @@ This guide explains how Git works in the `OC-SCRIPT-EXTRACTOR` project, how to t
 
 ## Repository Structure
 
-**Local Path:** `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/`  
+**Local Path:** Project root directory (clone location)
 **GitHub URL:** https://github.com/ficusai/SCRIPT  
 **Primary Branch:** `main`  
 **Total Commits:** ~154  
@@ -41,7 +41,7 @@ This guide explains how Git works in the `OC-SCRIPT-EXTRACTOR` project, how to t
 
 ### Step 1: Check Repository Status
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR status
+git -C . status
 ```
 - Shows modified, added, or deleted files
 - Green text = unstaged changes
@@ -49,7 +49,7 @@ git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR status
 
 ### Step 2: View Changes
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR diff
+git -C . diff
 ```
 - Shows exact line-by-line changes in working directory
 - Use `git diff --staged` to see staged changes only
@@ -57,17 +57,17 @@ git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR diff
 ### Step 3: Stage Changes
 ```bash
 # Stage a specific file
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR add <filename>
+git -C . add <filename>
 
 # Stage all changes
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR add .
+git -C . add .
 ```
 - Staged changes are ready to commit
 - Green color in `git status` = staged
 
 ### Step 4: Commit Changes
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR commit -m "Your commit message"
+git -C . commit -m "Your commit message"
 ```
 - Creates permanent snapshot of staged changes
 - Commit hash example: `a1b2c3d4e5f6`
@@ -76,13 +76,13 @@ git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR commit -m "Your commit mess
 ### Step 5: View History
 ```bash
 # Recent commits (default: 5)
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR log --oneline
+git -C . log --oneline
 
 # Detailed history with author and date
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR log
+git -C . log
 
 # Full commit details including file changes
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR show <commit-hash>
+git -C . show <commit-hash>
 ```
 
 ---
@@ -145,16 +145,16 @@ git push -u origin main             # Set upstream tracking branch
 
 **Solution A: Restore from last commit**
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR restore <file>
+git -C . restore <file>
 ```
 
 **Solution B: Restore from specific commit**
 ```bash
 # Find the commit hash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR log --oneline
+git -C . log --oneline
 
 # Restore file from that commit
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR checkout <commit-hash> -- <file>
+git -C . checkout <commit-hash> -- <file>
 ```
 
 ### Scenario 2: Commit Was Made With Errors
@@ -162,13 +162,13 @@ git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR checkout <commit-hash> -- <
 
 **Solution A: Amend last commit (before pushing)**
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR add <file>
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR commit --amend -m "Corrected message"
+git -C . add <file>
+git -C . commit --amend -m "Corrected message"
 ```
 
 **Solution B: Revert a bad commit (creates new commit to undo)**
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR revert <commit-hash>
+git -C . revert <commit-hash>
 ```
 
 ### Scenario 3: Lost Commits (Detached HEAD)
@@ -177,10 +177,10 @@ git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR revert <commit-hash>
 **Solution: Find and return to main**
 ```bash
 # Find your lost commit
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR reflog
+git -C . reflog
 
 # Return to main branch
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR checkout main
+git -C . checkout main
 ```
 
 ### Scenario 4: Merge Conflict Resolution
@@ -232,7 +232,7 @@ git bisect reset                      # Exit bisect mode
 ### Interactive Rebase (Rewrite History)
 ```bash
 # Rebase last 3 commits interactively
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR rebase -i HEAD~3
+git -C . rebase -i HEAD~3
 # Options: pick, edit, squash, reword, drop
 ```
 
@@ -270,16 +270,16 @@ git clone https://github.com/ficusai/SCRIPT.git
 
 ### Pulling Latest Changes
 ```bash
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR pull origin main
+git -C . pull origin main
 ```
 
 ### Pushing to Remote
 ```bash
 # Set upstream tracking
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR push -u origin main
+git -C . push -u origin main
 
 # Push after initial setup
-git -C /home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR push origin main
+git -C . push origin main
 ```
 
 ### Creating Pull Requests

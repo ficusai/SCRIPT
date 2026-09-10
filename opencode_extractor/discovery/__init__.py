@@ -11,7 +11,7 @@ Discovery package re-exports.
 #   - Database sources returned as List[DatabaseSource]:
 #       DatabaseSource(
 #         label="Primary Local SSD Database (12.4 MB)",
-#         path="/home/ficus-pro/.local/share/opencode/opencode.db",
+#         path="~/.local/share/opencode/opencode.db",
 #         size_mb=12.4,
 #         kind="sqlite",
 #         session_count=45

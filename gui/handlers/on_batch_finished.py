@@ -14,7 +14,7 @@ from gui.handlers.filter_sessions import filter_sessions
 # Signal Payload & Parameters:
 # - scripts_cnt: Number of written code script files integer (e.g. 15, 0).
 # - tools_cnt: Number of recorded tool call log entries integer (e.g. 84, 0).
-# - out_path: Absolute output directory or zip file path string e.g. "/home/ficus-pro/Desktop/opencode_export_20260910_143000".
+# - out_path: Absolute output directory or zip file path string e.g. "~/Desktop/opencode_export_20260910_143000".
 #
 # UI Recovery & State Updates:
 # - window.progress_bar: setVisible(False) hides progress indicator bar.
@@ -56,7 +56,7 @@ def on_batch_finished(window, sessions_cnt: int, scripts_cnt: int, tools_cnt: in
 # Signature: on_batch_finished(window, sessions_cnt: int, scripts_cnt: int, tools_cnt: int, out_path: str) -> None
 #   scripts_cnt: number of script files written (int; may be 0 when export_scripts was unchecked).
 #   tools_cnt:   summed tool-call log entries (int; 0 when export_tool_calls was unchecked).
-#   out_path:    absolute folder path, e.g. "/home/ficus-pro/Desktop/opencode_export_20260910_143000",
+#   out_path:    absolute folder path, e.g. "~/Desktop/opencode_export_20260910_143000",
 #                or a ".zip" path when create_zip was enabled.
 #
 # Signal connected from: BatchExportWorker.finished_signal (via export_selected_sessions_dialog).
