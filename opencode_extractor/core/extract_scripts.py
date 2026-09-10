@@ -1,5 +1,19 @@
 """
 Extracts all script files created, edited, or executed in a session and its subagents.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported:
+    - Target File Extensions: .py, .js, .ts, .jsx, .tsx, .sh, .bash, .rs, .go, .java, .c, .cpp, .html, .css, .json, .md, .yml, .toml, .yaml, .txt, .sql, .dockerfile, .mk
+- Formats Handled:
+    - Full file content strings (from `write` tool)
+    - Unified diff patch strings (from `edit` tool)
+    - Bash heredoc, echo, and inline code snippets (from `bash` tool)
+    - Filesystem fallback content (via `read_disk_content`)
+- Export Modes Supported: Single session script artifact extractor with subagent tree traversal
+- Framework Possibilities:
+    - CLI: Core engine function for extracting scripts per session
+    - Code Mining: Build historical dataset of AI code generation and editing patterns
+    - Monorepo Analysis: Trace code evolution across parent and subagent worker sessions
 """
 
 from __future__ import annotations
@@ -92,30 +106,44 @@ from opencode_extractor.utils.parse_ts import parse_ts
 #     filePath key keeps the raw string.
 #   - Non-script files (e.g. binaries, logs) filtered out by `is_script_path`.
 #   - Two subagent sessions editing the same file -> merged artifact with multiple patches; additions/deletions accumulate.
+# Testing Steps:
+#   - Call `extract_scripts(extractor, "sess_123", include_errors=False)`
+#   - Verify returned list is sorted by `filePath.lower()`
 def extract_scripts(extractor, root_session_id: str, include_errors: bool = False) -> List[ScriptArtifact]:
     # Retrieve the hierarchy of sessions including the root and subagents.
+    # Returns RootTree object with `members` and `all_ids` properties
     tree = extractor.root_tree(root_session_id)
     member_map: Dict[str, SessionInfo] = {m.id: m for m in tree.members}
     session_ids = tree.all_ids
 
     # Parse JSON database rows for all tool operations in these sessions.
+    # Yields tuples of (session_id_str, parsed_json_dict)
     parts = parse_part_json(extractor.db_sources, extractor._conns, extractor._text_parts, session_ids)
     artifacts: Dict[str, ScriptArtifact] = {}
     written: Dict[str, ScriptArtifact] = {}
 
     # Inspect each tool call record.
     for sid, obj in parts:
+        # Ignore step objects that are not tool invocations
         if obj.get("type") != "tool":
             continue
         tool = obj.get("tool")
+
+        # Ignore tools that do not generate or edit code scripts
         if tool not in CODE_TOOLS and tool != "bash":
             continue
+
+        # Extract tool execution status
         state = obj.get("state") or {}
         status = state.get("status") or ""
+
+        # Filter out errored steps unless include_errors=True
         if status == "error" and not include_errors:
             continue
         if status not in ("completed", "error", "running", "pending", ""):
             continue
+
+        # Extract input parameters and session metadata attribution
         inp = state.get("input") or {}
         info = member_map.get(sid)
         agent = info.agent if info else ""
@@ -128,6 +156,7 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
         if tool == "write":
             fp = inp.get("filePath") or ""
             content = inp.get("content") or ""
+            # Validate path and verify script file type
             if not fp or not is_script_path(fp, content):
                 continue
             art = ScriptArtifact(
@@ -215,3 +244,4 @@ def extract_scripts(extractor, root_session_id: str, include_errors: bool = Fals
     # Sort final list by file path in lower case for consistency.
     final.sort(key=lambda a: a.filePath.lower())
     return final
+
