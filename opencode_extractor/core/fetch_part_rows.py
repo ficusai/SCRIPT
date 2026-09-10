@@ -67,6 +67,10 @@ def fetch_part_rows(
 ):
     # Convert iterable of session IDs to a list.
     # Variable Type: List[str]
+    # (Performance Note: Materializing session_ids into a list upfront means the full iterable is held in memory.
+    #  For generator-based callers, this defeats lazy evaluation. However, the chunked SQL query below requires
+    #  indexed access (ids[i:i+200]), so a list is necessary. If session_ids is very large (>50k), consider
+    #  increasing the chunk size (currently 200) proportionally to reduce the number of SQL round-trips.)
     ids = list(session_ids)
 
     # Process each database source registered in the system.
@@ -79,6 +83,9 @@ def fetch_part_rows(
 
                 # Chunk ID list into batches of 200 to stay well within SQLite SQL variable limits.
                 # Chunk Size: 200 items per SQL query batch
+                # (Performance Note: The hardcoded chunk size of 200 is conservative (SQLite default limit is 999).
+                #  For systems with ample resources, increasing this to 500-900 could reduce SQL round-trips by
+                #  2-3x for large session_id lists. Measure with your typical dataset size to find the optimal value.)
                 for i in range(0, len(ids), 200):
                     chunk = ids[i:i + 200]
                     # Generate dynamic SQL placeholder string (?, ?, ...).
@@ -86,6 +93,10 @@ def fetch_part_rows(
 
                     # Execute SQL SELECT statement to fetch matching part table records.
                     # Yields tuples: (session_id: str, data: str)
+                    # (Performance Note: Using yield from with con.execute() streams rows one at a time, which is
+                    #  memory-efficient. However, the caller (parse_part_json) immediately materializes all yielded
+                    #  rows into a list, negating the streaming benefit. To realize streaming advantages, downstream
+                    #  consumers should process rows as they arrive rather than collecting them all.)
                     yield from con.execute(
                         f"SELECT session_id, data FROM part WHERE session_id IN ({ph})", chunk
                     )
