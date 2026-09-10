@@ -2,45 +2,52 @@
 Pattern for detecting script execution commands in terminal actions.
 """
 
+# Module note: This file defines EXEC_RE, a compiled regular expression used to detect terminal commands
+# that execute script files using known interpreters (python, bash, node, ruby, perl, etc.).
+# It matches patterns like: python3 main.py, bash -x script.sh, node server.js
+# The regex captures one group: the script path (including any directory components).
+# Flag used: re.I (case-insensitive matching for interpreter names and extensions).
+
 # Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
 # Import regular expression module re for compiled regex pattern matching
 import re
 
-# Module Purpose & Overview:
-# Defines a compiled regular expression object (EXEC_RE) used to scan bash execution strings for commands that run code files using standard interpreters (e.g., `python3 main.py`, `bash script.sh`, `node server.js`).
-#
-# Variable Type & Flags:
-#   - Name: EXEC_RE
-#   - Type: re.Pattern (Compiled Regular Expression Pattern)
-#   - Flags: re.I (IGNORECASE - makes interpreter names and file extensions case-insensitive).
-#
-# Token-by-Token Regular Expression Breakdown:
-#   - `(?:python3?|bash|sh|zsh|node|ruby|perl)` : Non-capturing group for interpreter names:
-#       * Python: python, python3
-#       * Shell: bash, sh, zsh
-#       * Runtime / Scripting: node, ruby, perl
-#   - `\s+` : At least one whitespace character separating interpreter from options/script path.
-#   - `(?:\-[a-zA-Z]+\s+)*` : Zero or more single-dash command-line flags (e.g. `-u `, `-x `, `-e `).
-#   - `['\"]?` : Optional opening quote around script path.
-#   - `([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))` : CAPTURE GROUP 1 (Target script path ending in supported extension):
-#       * Supported extensions: .py, .sh, .bash, .js, .ts, .rb, .pl, .lua, .php, .pyw
-#   - `['\"]?` : Optional closing quote around script path.
-#
-# Capture Group Output:
-#   - Group 1: Executed script path string (e.g., "main.py", "scripts/deploy.sh", "server.js")
-#
-# Verified Matches & Non-Matches:
-#   - Match: python3 main.py -> Group 1: "main.py"
-#   - Match: bash -x scripts/deploy.sh -> Group 1: "scripts/deploy.sh"
-#   - Match: node server.js -> Group 1: "server.js"
-#   - Non-match: python3 script.txt -> Extension .txt is not in supported extension list.
-#
-# How to Test:
-#   - Run: python3 -c 'from opencode_extractor.constants.exec_re import EXEC_RE; m = EXEC_RE.search("python3 main.py"); print(m.group(1) if m else None)' (outputs "main.py")
-
 # Constant definition: Compiled regex matching script execution commands in terminal actions
+# This pattern detects commands that run script files through standard interpreters.
+#
+# Token breakdown:
+#   (?:python3?|bash|sh|zsh|node|ruby|perl)  -> NON-CAPTURING group of interpreter names:
+#       * python3? matches "python" or "python3" (the ? makes '3' optional)
+#       * bash, sh, zsh are shell interpreters
+#       * node is the JavaScript runtime
+#       * ruby and perl are scripting language interpreters
+#   \s+         -> one or more whitespace chars separating interpreter from arguments
+#   (?:\-[a-zA-Z]+\s+)*  -> NON-CAPTURING zero-or-more group for single-letter flags:
+#       * Matches patterns like "-u ", "-x ", "-e " (flag + required space)
+#       * The * allows zero flags (e.g., "python3 main.py" with no flags)
+#   ['\"]?     -> optional opening quote around script path (not required)
+#   ([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))  -> CAPTURE GROUP 1:
+#       * [^\s'\"|&><;]+ = one or more chars that are NOT whitespace, quotes, or shell operators
+#       * \. = literal dot separator before extension
+#       * (?:py|sh|bash|js|ts|rb|pl|lua|php|pyw) = whitelisted file extensions
+#   ['\"]?     -> optional closing quote around script path
+#
+# How it works:
+#   The pattern searches anywhere in a string for an interpreter name followed by optional flags
+#   and a script file with a recognized extension. Directory paths in the script name are allowed.
+#
+# Edge cases:
+#   - Multiple flags: "python3 -u -x script.py" -> Group 1 captures "script.py"
+#   - Quoted path: 'python3 "my script.py"' -> Group 1 captures "my script.py"
+#   - Nested paths: "bash /home/user/deploy/script.sh" -> Group 1 captures full path
+#   - Unsupported extension: "python3 script.txt" -> NO MATCH (txt not in whitelist)
+#
+# Non-matching examples:
+#   - python3 script.txt (extension not whitelisted)
+#   - vim main.py (vim is not a recognized interpreter)
+#   - echo hello (no script file involved)
 EXEC_RE = re.compile(
     # Pattern string: Matches interpreter name, optional flags, and script path with whitelisted extension
     r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-[a-zA-Z]+\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
