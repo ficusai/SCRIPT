@@ -30,6 +30,19 @@ from typing import Optional
 #   - db_source_path: str (Optional, default="") Absolute path to database file containing this session.
 #   - subagent_count: int (Optional, default=0) Number of child subagent sessions created by this session.
 #
+# Data Constraints & Edge Cases:
+#   - Session IDs are strings with no format validation; they may contain any characters including pipes "|"
+#   - Timestamps are datetime objects from parse_ts(); may be None if DB column is NULL or 0
+#   - ISO 8601 format is NOT enforced; timestamps come from SQLite REAL/INT columns as seconds-since-epoch
+#   - parent_id references another session's id; orphaned references (parent not in loaded set) are silent
+#   - subagent_count is computed post-load and only counts direct children, not transitive descendants
+#   - db_source_path may be empty string "" for text dump sources before source path is known
+#   - No uniqueness guarantee on id field; first occurrence wins during multi-source loading
+#   - Field naming is inconsistent: some fields use snake_case (time_created) while others use camelCase elsewhere
+# (Data Note: Session metadata container. All string fields accept arbitrary input; no URI/path validation.
+#  Timestamp coercion: SQLite NULL -> None, SQLite 0 -> None, SQLite REAL/INT -> datetime via parse_ts().
+#  The is_subagent property derives from parent_id truthiness; empty string "" is treated as root session.)
+#
 # Properties:
 #   - is_subagent -> bool: Returns True if parent_id is set (indicating a child subagent session), or False if root.
 #   - display_title -> str: Returns clean session title, falling back to session ID or "(untitled session)".
@@ -41,6 +54,8 @@ from typing import Optional
 @dataclass
 class SessionInfo:
     # Line explanation: Unique identification string for session
+    # (Data Note: Session ID format is opaque; may be "sess_<hex>" from SQLite or arbitrary string from dumps.
+    #  No regex validation; downstream code assumes alphanumeric+underscore but does not enforce it.)
     id: str
     
     # Line explanation: User or system title string describing session topic
