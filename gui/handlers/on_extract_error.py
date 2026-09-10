@@ -1,3 +1,8 @@
+# Module note: Script Extraction Error Handler Callback.
+# Purpose: Handles failures during single session script extraction background operations.
+# Plain-language overexplanation for beginners:
+# If extracting script files for a selected session encounters an error, this callback hides the progress bar and shows a warning dialog describing the issue.
+
 from PyQt6.QtWidgets import QMessageBox
 
 
