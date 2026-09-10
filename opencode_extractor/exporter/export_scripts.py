@@ -1,5 +1,14 @@
 """
 Saves collected script files to disk or packages them into a ZIP archive (legacy wrapper).
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Any source extension (.py, .js, .ts, .sh, .rs, .go, .java, .c, .cpp, .html, .css, .json, .md, .yml, .toml)
+- Formats Handled: Plain text source files, unified diff patches (.patch), ZIP file archives (.zip)
+- Export Modes Supported: Single session script-only legacy export mode
+- Framework Possibilities:
+    - CLI: Target of legacy CLI script export subcommands
+    - Web API: Fast single-session script file extractor endpoint
+    - Build Pipelines (CI/CD): Extract executable scripts from session logs for automated execution
 """
 
 from __future__ import annotations
@@ -44,6 +53,9 @@ from opencode_extractor.models.session_info import SessionInfo
 # Edge Cases:
 #   - `scripts` list is empty `[]`: Returns early with `(0, dest_dir)` without calling exporter.
 #   - scripts[0] has no session_agent: dummy agent becomes "build".
+# Testing Steps:
+#   - Step 1: Pass empty scripts list `[]` to `export_scripts(scripts=[], dest_dir="/tmp/out")` -> returns `(0, "/tmp/out")`
+#   - Step 2: Pass non-empty scripts list -> verify files written in `/tmp/out`
 def export_scripts(
     scripts: List[ScriptArtifact],
     dest_dir: str,
@@ -55,10 +67,18 @@ def export_scripts(
     on_progress=None,
 ) -> Tuple[int, str]:
     # Return early if script list is empty.
+    # Condition: `if not scripts:` checks for empty list `[]` or `None`
+    # Return: (0, dest_dir) tuple containing script count 0 and untouched output directory path
     if not scripts:
         return 0, dest_dir
+
     # Extract session metadata from the first script entry to construct a placeholder session.
+    # Variable Type: str
+    # Sample Value: "sess_20260910_abc123"
     first_sess_id = scripts[0].session_id
+
+    # Construct synthetic SessionInfo instance to satisfy exporter bundle requirement
+    # Instance Fields: id (str), title (str), agent (str), model (str=""), directory (str=""), parent_id (None), time_created (datetime), time_updated (None)
     dummy_session = SessionInfo(
         id=first_sess_id,
         title=scripts[0].session_title or "Exported Session",
@@ -69,13 +89,17 @@ def export_scripts(
         time_created=scripts[0].time,
         time_updated=None,
     )
+
     # Build a temporary SessionExportBundle containing only scripts.
+    # Instance Fields: session (SessionInfo), scripts (List[ScriptArtifact]), tool_calls (empty List `[]`)
     bundle = SessionExportBundle(
         session=dummy_session,
         scripts=scripts,
         tool_calls=[],
     )
+
     # Forward export request to the main bundle exporter.
+    # Returns: s_written (int count of scripts exported), _t_written (ignored tool call count 0), out_path (str output path)
     s_written, _t_written, out_path = export_session_bundles(
         [bundle],
         dest_dir,
@@ -88,4 +112,8 @@ def export_scripts(
         folder_name=folder_name,
         on_progress=on_progress,
     )
+
+    # Return script count and output path
+    # Output: Tuple[int, str] e.g. (3, "/tmp/extracted_scripts/opencode_export_Exported_Session_20260910_120000")
     return s_written, out_path
+
