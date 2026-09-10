@@ -81,6 +81,16 @@ def export_selected_sessions_dialog(window):
         "Select Output Folder to Save Exported Sessions & Tool Calls",
         os.path.expanduser("~/Desktop"),
     )
+    # (Security Note: User-Provided Output Path - dest_dir comes directly from QFileDialog, which returns
+    #  a user-selected filesystem path. The path is validated only by checking `if not dest_dir` (empty string).
+    #  There is no check that the path is within an allowed directory tree, no normalization of ".." segments,
+    #  and no permission check before the BatchExportWorker writes files there. If dest_dir is writable but
+    #  not where the user intended (e.g., if a symlink was placed at ~/Desktop/exports -> /etc/), files
+    #  would be written to the symlink target. (CWE-22: Improper Limitation of a Pathname to a Restricted Directory)
+    #
+    # (Security Note: SQL Injection - db_path ("all" or a file path) is passed as a string to OpenCodeExtractor.
+    #  If set to "all", it triggers auto-discovery. If set to a specific path, that path is used directly
+    #  for SQLite connection. The path is not validated for existence until connect_sqlite() is called.
     # (UX Note: The folder dialog title is very long ("Select Output Folder to Save Exported Sessions & Tool Calls").
     #  Consider shortening to "Select Export Location" for better readability, especially on smaller screens.)
     # (UX Note: The dialog defaults to ~/Desktop which may not be appropriate for all users. Consider remembering
