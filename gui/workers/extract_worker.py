@@ -109,9 +109,32 @@ class ExtractWorker(QThread):
 #   - Session with 0 scripts: extract a real session that only chatted -> finished with [] ;
 #     status_lbl "Extracted 0 script artifacts." and script_count_lbl "Found 0 script files...".
 #   - Session with 100+ artifacts -> list population is fast and scrollable.
-#   - Unknown ID: ExtractWorker("ses_99999999", "all") -> warning dialog
-#     "Could not extract scripts: Session ses_99999999 not found in database".
+#   - Unknown ID: ExtractWorker("ses_99999999", "all") -> error_signal emitted with "Session ses_99999999 not found in database".
 #   - Patch-only artifact: art.content == "" and art.patches non-empty -> preview shows
 #     "# --- EDIT PATCHES ---" header over joined diffs (see on_script_selected).
 #   - Rapid table-row clicks -> each click creates a fresh ExtractWorker; the newest one wins;
 #     verify no interleaved previews and no crash from the earlier threads' late signals.
+# (Test Note: Missing test suite — add pytest-qt tests for:
+#   1. Happy path: valid session -> finished_signal emits list[ScriptArtifact], all artifacts have .filePath and .basename.
+#   2. Empty result: session with no scripts -> finished_signal emits [], NOT error_signal.
+#   3. KeyError path: unknown session_id -> error_signal emitted, NOT finished_signal.
+#   4. Sort order: verify returned scripts sorted by filePath.lower() (matches extract_scripts contract).
+#   5. Source kinds: verify artifacts have correct source_kind ("write_content", "patches_only", "bash_heredoc", etc.).
+#   6. Thread lifecycle: thread.isRunning() True after start(), False after finished/error.
+#   7. Signal payload types: assert isinstance(scripts, list) and all(isinstance(s, ScriptArtifact) for s in scripts).
+#   8. Concurrent rapid clicks: click 5 different rows rapidly -> last finishing signal sets correct scripts, no stale preview.
+#   9. DB path propagation: verify self.db_path passed to OpenCodeExtractor(context manager).
+#   10. Connection cleanup: verify extractor._conns emptied after run() (context manager __exit__ called).
+#   Isolated test:
+#   ```python
+#   from gui.workers.extract_worker import ExtractWorker
+#   from PyQt6.QtCore import QCoreApplication
+#   import sys
+#   app = QCoreApplication(sys.argv)
+#   worker = ExtractWorker("ses_nonexistent", "/tmp/nonexistent.db")
+#   errors = []
+#   worker.error_signal.connect(lambda e: errors.append(e))
+#   worker.start(); app.exec()
+#   assert len(errors) == 1 and "not found" in errors[0].lower()
+#   ```
+# )

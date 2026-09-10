@@ -48,9 +48,15 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   - Session ID belongs to a SUBAGENT rather than a root: still extracts fine; its own children (rare) and
 #     script/tool history are bundled under it.
 #   - Cyclic parent links involving root_session_id: find_descendants dedupes via its seen-set before filtering.
-# Testing Steps:
-#   - Call `extract_session_bundle(extractor, "sess_123")`
-#   - Verify returned object is an instance of `SessionExportBundle`
+# (Test Note: Missing test suite — this project has zero test files. Add pytest unit tests for:
+#   1. Happy path: valid session with subagents + scripts + tool_calls -> verify SessionExportBundle fields populated correctly.
+#   2. KeyError propagation: call with nonexistent session ID -> verify KeyError raised (not caught).
+#   3. include_errors=True vs False: verify error-status scripts are included/excluded while error tool_calls ALWAYS appear.
+#   4. Empty tree: session with no subagents -> subagents list is empty, not None.
+#   5. Subagent-as-root: pass a subagent session ID -> bundle should still extract its own children/scripts/tool_calls.
+#   Run: python3 -m pytest tests/ -v  (after creating test dir)
+#   Manual CLI verification: python3 -m opencode_extractor extract-bundle sess_123
+# )
 def extract_session_bundle(extractor, root_session_id: str, include_errors: bool = True) -> SessionExportBundle:
     # Retrieve base information for the root session.
     # Variable Type: Optional[SessionInfo]

@@ -44,9 +44,16 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 # Edge Cases:
 #   - Single session fails extraction (e.g. KeyError or database corruption): Exception caught by try/except block, skipping failed session and continuing processing remaining sessions.
 #   - `root_session_ids` is empty `[]`: Returns empty list `[]` without raising errors.
-# Testing Steps:
-#   - Call `extract_multiple_bundles(extractor, ["sess_1", "sess_2"])`
-#   - Verify returned list contains `SessionExportBundle` objects for valid session IDs
+# (Test Note: Missing test suite — add pytest tests for:
+#   1. Empty input: extract_multiple_bundles(ex, []) -> returns [] immediately, no callback fired.
+#   2. Single valid session: returns list with one SessionExportBundle.
+#   3. One invalid + one valid: [bad_id, good_id] -> list length 1, bad session silently skipped.
+#   4. Progress callback: on_progress fires for EVERY session including failed ones, in 1-based order.
+#   5. Progress callback raises: exception propagates immediately, loop does not catch it.
+#   6. Duplicate IDs: [sid, sid] -> two separate bundles returned (no dedup across input).
+#   7. Multi-database scenario: sessions spanning two SQLite DBs -> bundles correct across sources.
+#   Run: python3 -m pytest tests/test_extract_multiple_bundles.py -v
+# )
 def extract_multiple_bundles(
     extractor, root_session_ids: List[str], include_errors: bool = True, on_progress=None
 ) -> List[SessionExportBundle]:

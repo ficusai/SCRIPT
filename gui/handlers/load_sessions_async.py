@@ -80,3 +80,22 @@ def load_sessions_async(window):
 #   - Window closed mid-scan: the detached thread finishes; its finished/error lambdas still fire.
 #     Handlers only touch widgets, so no crash occurs during shutdown as long as the window object
 #     is still alive; the app should quit promptly after closeEvent to avoid lingering threads.
+# (Test Note: Missing test suite — add pytest-qt or unittest tests for:
+#   1. Signal connection integrity: verify scan_thread.finished_signal.connect() and error_signal.connect() called before start().
+#   2. refresh_btn state machine: disabled before start(), re-enabled only via on_scan_error or on_sessions_loaded.
+#   3. Progress bar state: setRange(0,0) (indeterminate) before start, hidden only after callback.
+#   4. Detached thread cleanup: if window is deleted mid-scan, ensure Qt does not raise AttributeError on late signal delivery.
+#   5. Re-entrancy: calling load_sessions_async() twice in quick succession replaces scan_thread; old thread completes on its own.
+#   6. State propagation: verify on_sessions_loaded receives correct (roots, counts, db_sources) tuple types.
+#   7. Missing DB error path: window.current_db_path="/nonexistent.db" -> on_scan_error shows critical dialog, buttons re-enabled.
+#   8. Multi-DB scan: pass multiple DatabaseSource objects, verify counts dict covers all sessions.
+#   Manual test: python3 -c "
+#     from PyQt6.QtWidgets import QApplication
+#     from gui.main_window import MainWindow
+#     app = QApplication([])
+#     w = MainWindow()
+#     import time; time.sleep(3)
+#     print('Status:', w.status_lbl.text())
+#     print('Sessions:', len(w.root_sessions))
+#   "
+# )
