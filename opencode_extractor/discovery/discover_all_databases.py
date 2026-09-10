@@ -214,14 +214,11 @@ def discover_all_databases() -> List[DatabaseSource]:
                 elif "imported_databases" in p:
                     fn = os.path.basename(p)
                     label = f"Imported Backup DB: {fn} ({size_mb:.1f} MB)"
-                elif "/run/media/" in p:
-                    # (Line note: Parse the drive name from paths like "/run/media/ficus-pro/USB_DRIVE/...".
-                    #  Split on "/run/media/ficus-pro/" and take the first path component as the drive name.
-                    #  If the split fails (unexpected path format), fall back to "External".
-                    # Parse drive name from paths like "/run/media/<username>/<drive>/..."
-                    # Dynamically detect username to work across different systems
-                    parts = p.split("/run/media/")[-1].split("/") if "/run/media/" in p else []
-                    drive_name = parts[1] if len(parts) > 1 else parts[0] if parts else "External"
+                elif "/run/media/" in p or "/media/" in p or "/mnt/" in p:
+                    # Parse drive name dynamically from mount paths like "/run/media/<user>/<drive>/..." or "/media/<user>/<drive>/..."
+                    prefix = "/run/media/" if "/run/media/" in p else ("/media/" if "/media/" in p else "/mnt/")
+                    parts = p.split(prefix)[-1].split("/") if prefix in p else []
+                    drive_name = parts[1] if len(parts) > 1 else (parts[0] if parts else "External")
                     label = f"External Drive DB ({drive_name}) ({size_mb:.1f} MB)"
                 else:
                     # (Line note: General fallback label for any database not matching the above patterns.

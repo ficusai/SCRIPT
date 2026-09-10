@@ -38,11 +38,7 @@ TEXT_DUMP_PATHS = [
     os.path.expanduser("~/.local/share/opencode/imported_sessions/opencode_parts.txt"),
 
     # Line explanation: Glob pattern matching text session dumps on mounted external backup drives
-    # Matches nested path: /run/media/<username>/<volume>/Unified_Backup*/*/opencode_parts.txt
-    # Wildcard structure:
-    #   * (first) = username (e.g., "ficus-pro")
-    #   * (second) = volume name (e.g., "USB-STICK", "External-HDD")
-    #   Unified_Backup* = volume subdirectory starting with "Unified_Backup"
-    #   * (third) = year/month subfolder (e.g., "2024-01", "2024-02")
     "/run/media/*/*/Unified_Backup*/*/opencode_parts.txt",
+    "/media/*/*/Unified_Backup*/*/opencode_parts.txt",
+    "/mnt/*/*/opencode_parts.txt",
 ]

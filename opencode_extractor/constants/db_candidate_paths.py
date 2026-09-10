@@ -66,15 +66,19 @@ DB_CANDIDATE_PATHS = [
     #  Multiple backup files will all be discovered; deduplication by session ID occurs later.)
     os.path.expanduser("~/.local/share/opencode/imported_databases/*.db"),
 
-    # Line explanation: Glob pattern for external drives mounted under /run/media/<username>/<volume>/
+    # Line explanation: Glob pattern for external drives mounted under /run/media/<username>/<volume>/ (Fedora/RHEL)
     # Matches nested path: /run/media/*/*/.local/share/opencode/opencode.db
-    # (Data Note: External drive paths are transient; drive must be mounted for discovery.
-    #  The double-wildcard matches any username directory and any volume name.)
     "/run/media/*/*/.local/share/opencode/opencode.db",
 
+    # Line explanation: Glob pattern for external drives mounted under /media/<username>/<volume>/ (Debian/Ubuntu/Mint)
+    "/media/*/*/.local/share/opencode/opencode.db",
+    "/media/*/.local/share/opencode/opencode.db",
+
+    # Line explanation: Glob pattern for manually mounted drives under /mnt/
+    "/mnt/*/.local/share/opencode/opencode.db",
+    "/mnt/*/*/.local/share/opencode/opencode.db",
+
     # Line explanation: Glob pattern for unified backup volumes on external drives
-    # Matches drives named "Unified_Backup*" in their volume path
-    # (Data Note: Case-sensitive glob; only matches volumes starting with "Unified_Backup".
-    #  The triple-wildcard allows arbitrary depth in the path hierarchy.)
     "/run/media/*/*/Unified_Backup*/*/.local/share/opencode/opencode.db",
+    "/media/*/*/Unified_Backup*/*/.local/share/opencode/opencode.db",
 ]
