@@ -34,8 +34,11 @@ from typing import Optional
 
 # Function declaration: Takes path string and optional content, returns True for valid scripts and False for junk files
 def is_script_path(path: str, content: Optional[str] = None) -> bool:
-    # Line explanation: Checks if path is None, empty (""), or contains only blank whitespace.
-    # Output / Early Return: Returns False if path has no text.
+    # (Security Note: Path Traversal Risk - The function only examines the basename, not the full path.
+    #  A path like "../../etc/passwd.py" would pass because its basename "passwd.py" has a valid extension.
+    #  This means malicious paths with directory traversal components can bypass this filter.
+    #  Mitigation: Callers should validate that the directory portion does not contain ".." segments.
+    #  See safe_name() in utils/safe_name.py for path sanitization before filesystem operations.
     if not path or not path.strip():
         return False
         
