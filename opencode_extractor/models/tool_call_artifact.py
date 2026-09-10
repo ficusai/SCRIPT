@@ -2,90 +2,74 @@
 Holds extracted tool call content and metadata.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import datetime module as _dt for timestamp representation
 import datetime as _dt
+
+# Import dataclass and field utilities for dataclass definition
 from dataclasses import dataclass, field
+
+# Import Optional type hint for optional attributes
 from typing import Optional
 
 
-# A data container recording an individual action invoked by an AI tool (including input arguments, output text, and error logs).
+# Class Purpose & Overview:
+# Data container recording an individual action invoked by an AI tool (such as file reads, writes, edits, bash commands, glob searches, or grep queries), storing input arguments, output text, error messages, and execution metadata.
 #
-# ============================================================================
-# FIELD-BY-FIELD SPECIFICATION
-# ============================================================================
-#   Field           Python type            Required?  Default   Valid test values
-#   -----           -----------            --------   -------   ----------------
-#   call_id         str                    YES        (none)    "call_abc123", "" (if missing)
-#   tool_name       str                    YES        (none)    "write", "edit", "bash", "read", "glob",
-#                                                              "grep", "task", "unknown" (missing tool)
-#   session_id      str                    YES        (none)    "sess_01HJ89XYZ"
-#   session_agent   str                    YES        (none)    "build", "explore", "" (unknown member)
-#   session_title   str                    YES        (none)    "Fix auth", ""
-#   is_subagent     bool                   YES        (none)    True / False (from parent_id presence)
-#   status          str                    YES        (none)    "completed", "error", "running", "pending", ""
-#   time            Optional[datetime]     YES        (none)    datetime obj or None (missing/unparseable)
-#   input_params    dict                   NO         {}        {"filePath": "a.py", "content": "..." } etc.
-#   output          str                    NO         ""        stdout text or pretty-printed JSON string
-#   error           Optional[str]          NO         None      "Permission denied", None
-#   db_source_path  str                    NO         ""        "/path/to/opencode.db", ""
+# Field Specification & Types:
+#   - call_id: str (Required) Unique identifier string for the tool invocation step (e.g. "call_abc123").
+#   - tool_name: str (Required) Name of invoked tool (e.g. "write", "edit", "bash", "read", "glob", "grep", "task").
+#   - session_id: str (Required) AI session ID string.
+#   - session_agent: str (Required) Agent name string (e.g. "build", "explore", "coder").
+#   - session_title: str (Required) Human-readable title of session.
+#   - is_subagent: bool (Required) True if invoked within a child subagent session; False if main session.
+#   - status: str (Required) Execution status ("completed", "error", "running", "pending").
+#   - time: Optional[datetime] (Required) Timestamp when tool call started, or None.
+#   - input_params: dict (Optional, default={}) Dictionary of input parameters passed to tool (e.g. {"filePath": "a.py"}).
+#   - output: str (Optional, default="") Output text or pretty-printed JSON returned by tool execution.
+#   - error: Optional[str] (Optional, default=None) Error text string if tool execution failed, or None if successful.
+#   - db_source_path: str (Optional, default="") Absolute path to database containing tool call record.
 #
-# ============================================================================
-# PIPELINE POPULATION (extract_tool_calls - every type=="tool" step in the session wave)
-# ============================================================================
-#   For each parsed step (sid, obj) across tree.all_ids:
-#     call_id        = obj["callID"] or obj["id"] or ""          (both keys attempted, then "")
-#     tool_name      = obj["tool"] or "unknown"
-#     status         = state["status"] or ""   (state = obj["state"] or {})
-#     input_params   = state["input"] if it is a dict, else {"raw": <non-dict value>};
-#                      missing input -> {} (empty dict)
-#     output         = state["output"]: dict/list -> json.dumps(..., indent=2); non-string scalars
-#                      wrapped via str(out_val or ""); None -> ""
-#     error          = state["error"]; non-str values converted with str(); None stays None
-#     session_agent/title/is_subagent/db_source_path  = from the session member map
-#                      (info.agent/title/is_subagent/db_source_path; ""/False/"" when member unknown)
-#     time           = parse_ts(obj["time"]["start"]) when obj["time"] is a dict, else None
-#   Output list is sorted ascending by `time` (None sorts as datetime.min -> first).
-#
-# ============================================================================
-# RELATIONSHIP TO CODE_TOOLS {"write", "edit"}
-# ============================================================================
-#   tool_name is checked against CODE_TOOLS only in the SCRIPT extraction path (extract_scripts).
-#   Here, in the tool-call transcript path, EVERY tool - including bash, read, glob, grep - becomes a
-#   ToolCallArtifact. So CODE_TOOLS membership is NOT enforced for this model; "bash" artifacts are
-#   created here AND also drive script extraction via parse_bash_artifacts.
-#
-# ============================================================================
-# CONSUMERS
-# ============================================================================
-#   - format_tool_calls_json: serializes the list to JSON (tools in input_params/output/error).
-#   - format_tool_calls_markdown: renders a Markdown transcript.
-#   - export_session_bundles counts len(bundle.tool_calls) for the summary and cache
-#     (mark_session_exported tool_call_count).
-#   - The CLI prints len(bundle.tool_calls) after extraction.
-#
-# ============================================================================
-# BOUNDARY & EDGE CASE TESTS
-# ============================================================================
-#   - Failed tool call with `error="Permission denied"`: `status` marked as "error", error string preserved.
-#   - Tool call with empty input params `input_params={}`: handled safely without KeyError.
-#   - Missing callID/id: falls back to "" (no KeyError).
-#   - Output is a dict/list: formatted via json.dumps(out_val, indent=2); raw scalars -> str().
-#   - Missing/None timestamps: parse_ts returns None; sorted to the front via datetime.min fallback.
-#   - Non-dict input (rare): stored as {"raw": value} so JSON serialization never breaks.
-#
-# CODE TOOL ACTIONS: CODE_TOOLS = {"write", "edit"}
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.models.tool_call_artifact import ToolCallArtifact; t = ToolCallArtifact("c1", "bash", "s1", "build", "Title", False, "completed", None); print(t.tool_name, t.input_params)' (outputs bash {})
+
+# Dataclass decorator creating constructor __init__ and default field initializers automatically
 @dataclass
 class ToolCallArtifact:
+    # Line explanation: Unique identification string for tool call execution step
     call_id: str
+    
+    # Line explanation: Name of invoked tool action ("write", "edit", "bash", "read", "glob", "grep", "task")
     tool_name: str
+    
+    # Line explanation: Unique ID string of session where tool call occurred
     session_id: str
+    
+    # Line explanation: Agent name assigned to session ("build", "explore", "coder")
     session_agent: str
+    
+    # Line explanation: Title of session where tool call occurred
     session_title: str
+    
+    # Line explanation: Boolean flag indicating if call occurred in subagent session (True) or main session (False)
     is_subagent: bool
+    
+    # Line explanation: Status string of step execution ("completed", "error", "running", "pending")
     status: str
+    
+    # Line explanation: Start timestamp of tool execution as datetime object or None
     time: Optional[_dt.datetime]
+    
+    # Line explanation: Input parameters dictionary passed to tool (defaults to empty dict)
     input_params: dict = field(default_factory=dict)
+    
+    # Line explanation: Result output text or formatted JSON string from tool execution (default "")
     output: str = ""
+    
+    # Line explanation: Error details string if tool execution failed; None if successful (default None)
     error: Optional[str] = None
+    
+    # Line explanation: Absolute filesystem path to database storing this tool call record (default "")
     db_source_path: str = ""
