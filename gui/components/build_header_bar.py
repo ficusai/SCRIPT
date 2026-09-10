@@ -8,6 +8,8 @@
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton
 # Line note: Import font control helper to customize title text size and weight.
 from PyQt6.QtGui import QFont
+# Line note: Import filter_sessions handler for search/filter signal callbacks.
+from gui.handlers.filter_sessions import filter_sessions
 
 # Function note: Constructs and returns the top header layout bar containing title, DB dropdown, search box, filter dropdown, and refresh button.
 # What it does: Assembles top navigation bar giving users controls for database source selection, live search filtering, session status filtering, and manual data refresh.
@@ -117,7 +119,6 @@ def build_header_bar(window) -> QHBoxLayout:
     window.search_input.textChanged.connect(lambda: filter_sessions(window))
     # Event Trigger: Fires `filter_sessions(window)` event callback on every keystroke event.
     # Manual trigger for tests: `window.search_input.setText("git")` fires textChanged and re-filters live.
-    window.search_input.textChanged.connect(lambda: filter_sessions(window))
     header_layout.addWidget(window.search_input)
 
     # Line note: Create dropdown menu for filtering sessions by category status.
