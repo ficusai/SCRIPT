@@ -124,3 +124,29 @@ Categories=Development;
 # - Edge cases & Errors: If application fails to signal startup completion, watch cursor may spin for 10 seconds before timing out.
 # - How to test: Observe cursor state immediately after clicking application launcher entry.
 StartupNotify=true
+
+# (Compat Note: Desktop Entry Specification — This file follows FreeDesktop.org Desktop Entry
+#  Specification 1.0+. Keys used (Type, Name, Comment, Exec, Path, Icon, Terminal, Categories,
+#  StartupNotify) are all part of the base specification and widely supported.
+#
+#  (Compat Note: Linux-only deployment — This .desktop file is intended for Linux desktop
+#  environments (GNOME, KDE, XFCE, Cinnamon). It will not work on Windows or macOS natively.
+#  On Windows, users should create a shortcut manually or use a .lnk file. On macOS, users
+#  should create a .app bundle or LaunchAgent.
+#
+#  (Compat Note: Hardcoded absolute path in Exec= and Path= — The path
+#  `/home/ficus-pro/Documents/OC-SCRIPT-EXTRACTOR/` is specific to the developer's machine.
+#  For distribution, this should use a relative path or be installed to a standard location
+#  like `/usr/local/bin/` or `~/.local/bin/`. The `%k` field code (for kiosks) or `$APPDIR`
+#  conventions could be used for portable deployments.
+#
+#  (Compat Note: Icon `utilities-terminal` is a freedesktop standard icon name. If the
+#  desktop environment does not have this icon theme installed, it falls back to a generic
+#  icon. For production, consider bundling a custom icon and referencing it by absolute path.
+#
+#  (Compat Note: StartupNotify=true requires a compliant window manager. On compositors that
+#  do not support startup notification (e.g., some tiling WMs), this key is ignored.
+#
+#  (Compat Note: Categories=Development; is a standard freedesktop category. On non-Linux
+#  systems that parse .desktop files (e.g., Windows file managers with WSL integration),
+#  unknown categories are ignored.
