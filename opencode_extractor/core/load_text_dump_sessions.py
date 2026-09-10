@@ -47,12 +47,20 @@ from opencode_extractor.models.session_info import SessionInfo
 #    - Title inference runs ONLY the first time a session ID is encountered
 #    - A non-dict JSON payload (list, string, number) is still stored in text_parts but cannot infer title
 #
-#  How to test:
-#    - Test with a valid text dump file containing one session: sessions dict should have one entry
-#    - Test with missing file path: should return without modifying sessions
-#    - Test with malformed JSON line: should skip that line and continue parsing others
-#    - Test with a session that also exists in SQLite: metadata should not be overwritten
-# )
+#  Data Integrity Considerations:
+#    - File encoding: UTF-8 with errors="replace" (invalid bytes become U+FFFD replacement character)
+#    - Pipe delimiter "|" inside JSON payloads is preserved because maxsplit=2 limits splits to 2
+#    - Session IDs from text dumps may contain any characters except newline (line.strip() removes whitespace)
+#    - JSON payload must be a valid JSON object {}; arrays/strings/numbers are stored but title inference fails
+#    - Title inference only checks obj["state"]["input"]["description"] path; other structures ignored
+#    - No timestamp parsing; all text dump sessions have time_created=None and time_updated=None
+#    - Model sentinel "opencode-dump" indicates dump-origin; not a real LLM model name
+#    - Data recovery: Partial parses are preserved; only fully malformed lines are dropped
+# (Data Note: Text dump session loader. The pipe-delimited format assumes no literal pipe characters in
+#  session IDs or message IDs (they would break parsing). The maxsplit=2 ensures the third field contains
+#  the full JSON payload including any embedded pipes. JSON parsing uses strict mode; malformed JSON is
+#  per-line skipped, not file-aborted. The sessions dict is mutated in-place; calling with an existing
+#  session ID only appends parts, never updates metadata.)
 def load_text_dump_sessions(
     # (Parameter note: Absolute or relative file path to the text dump file to parse.
     #  The file must be a plain text file with one JSON payload per line, pipe-delimited.
