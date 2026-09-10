@@ -1,5 +1,14 @@
 """
 Bundles metadata, subagent list, script artifacts, and tool calls for a root session wave.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: Evaluates script artifacts across all extensions (.py, .js, .ts, .sh, etc.)
+- Formats Handled: SessionExportBundle object graph containing session info, subagent list, script artifacts, tool call artifacts
+- Export Modes Supported: Single root session bundle extractor
+- Framework Possibilities:
+    - CLI: Primary single-session bundle extraction target
+    - Web Service (FastAPI / Flask): Serves bundled session data to frontend clients
+    - Archival Systems: Packs session artifacts into persistent storage bundles
 """
 
 from __future__ import annotations
@@ -39,23 +48,39 @@ from opencode_extractor.models.session_export_bundle import SessionExportBundle
 #   - Session ID belongs to a SUBAGENT rather than a root: still extracts fine; its own children (rare) and
 #     script/tool history are bundled under it.
 #   - Cyclic parent links involving root_session_id: find_descendants dedupes via its seen-set before filtering.
+# Testing Steps:
+#   - Call `extract_session_bundle(extractor, "sess_123")`
+#   - Verify returned object is an instance of `SessionExportBundle`
 def extract_session_bundle(extractor, root_session_id: str, include_errors: bool = True) -> SessionExportBundle:
     # Retrieve base information for the root session.
+    # Variable Type: Optional[SessionInfo]
+    # Exception: Raises KeyError if `info` is None
     info = extractor.get_session(root_session_id)
     if not info:
         raise KeyError(f"Session {root_session_id} not found in database")
+
     # Retrieve tree of all child subagent sessions under this root session.
+    # Variable Type: RootTree instance
     tree = extractor.root_tree(root_session_id)
+
     # Collect all member sessions except the main root session itself.
+    # Variable Type: List[SessionInfo]
     subagents = [m for m in tree.members if m.id != root_session_id]
+
     # Extract scripts created or modified in this session tree.
+    # Variable Type: List[ScriptArtifact]
     scripts = extractor.extract_scripts(root_session_id, include_errors=include_errors)
+
     # Extract tool call history recorded in this session tree.
+    # Variable Type: List[ToolCallArtifact]
     tool_calls = extractor.extract_tool_calls(root_session_id)
+
     # Assemble and return the final bundle.
+    # Output: SessionExportBundle object
     return SessionExportBundle(
         session=info,
         subagents=subagents,
         scripts=scripts,
         tool_calls=tool_calls,
     )
+
