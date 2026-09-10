@@ -2,90 +2,51 @@
 Replaces invalid Linux filename characters with safe underscores.
 """
 
+# Enable postponed evaluation of type annotations for Python 3.7+ compatibility
 from __future__ import annotations
 
+# Import regular expression module for string pattern search and replacement
 import re
 
 
-# Cleans a text string so it can be safely used as a filename on disk by turning forbidden characters (like / or ?) into underscores.
-# Data type: Function taking str and returning str
+# Function Purpose & Overview:
+# Cleans a text string so it can be safely used as a filename or folder name on disk by replacing forbidden characters (like slashes, colons, or question marks) with underscores.
 #
-# Function Parameters & Types:
-#   - name: str (Required) Raw name string to sanitize
+# Function Parameters:
+#   - name: str (Required) Input string to sanitize for filesystem safety (e.g., "feat/session:1", "my*script?.py", "...", "").
 # Returns:
-#   - str: Cleaned string safe for use as a filesystem path segment
+#   - str: Cleaned string safe for use as a filesystem path segment (e.g., "feat_session_1", "my_script_.py", "file").
 #
-# ============================================================================
-# STEP-BY-STEP REGEX PATTERN BREAKDOWN (`[/\\:*?\"<>|\x00-\x1f]`)
-# ============================================================================
-#   [/\\]      forward slash '/'  or  backslash '\\'   (both become '_')
-#   [:*?]      colon ':', asterisk '*', question mark '?'
-#   \"<>       double quote '"', less-than '<', greater-than '>'
-#   |          vertical pipe '|'
-#   \x00-\x1f  ASCII control characters 0x00..0x1F (newline 0x0A, tab 0x09, NUL 0x00, ESC 0x1B, ...)
-#   NOTE: only ONE replacement pass; every matched character is replaced with a single '_'.
-#   Character classes are SINGLE-character; a run like '???' becomes '___' (one '_' per char).
-#   Characters deliberately NOT replaced: spaces, bang '!', hash '#', ampersand '&', equals '=',
-#   percent '%', single quote, unicode non-control characters, and interior periods.
+# Regex Pattern Breakdown (`[/\\:*?\"<>|\x00-\x1f]`):
+#   - [/\\:*?\"<>|] : Matches any forbidden filename character:
+#       * Slashes: '/' (forward slash), '\\' (backslash)
+#       * Symbols: ':' (colon), '*' (asterisk), '?' (question mark), '"' (double quote), '<' (less than), '>' (greater than), '|' (pipe)
+#   - \x00-\x1f : Matches all ASCII non-printable control characters (hex 0x00 through 0x1F, such as linefeed, tab, null).
 #
-# ============================================================================
-# STEP-BY-STEP FUNCTION LOGIC (verified)
-# ============================================================================
-#   - Step 1: re.sub(r"[/\\:*?\"<>|\x00-\x1f]", "_", name)  - replace every forbidden char with '_'.
-#   - Step 2: .strip(" .") - strip ONLY leading and trailing SPACES and DOTS (interior ones stay).
-#   - Step 3: `or "file"` - when the result is falsy (""), return the fallback string "file".
+# Accepted & Transformed Values (Concrete Options):
+#   - safe_name("feat/session:1") -> "feat_session_1"
+#   - safe_name("my*script?.py") -> "my_script_.py"
+#   - safe_name("...") -> "file" (dots stripped -> empty string -> fallback "file")
+#   - safe_name("???") -> "___" ('?' replaced by '_' which is retained)
+#   - safe_name("") -> "file" (empty string -> fallback "file")
+#   - safe_name("  spaced name .sh ") -> "spaced name .sh" (interior spaces kept; leading/trailing spaces & dots stripped)
 #
-# ============================================================================
-# COMPREHENSIVE VERIFIED EXAMPLES (exact outputs)
-# ============================================================================
-#   - Example 1: safe_name("feat/session:1")            -> "feat_session_1"
-#   - Example 2: safe_name("  my*script?.py  ")          -> "my_script_.py"
-#   - Example 3: safe_name("...")                        -> "file"  (strips to "" -> fallback)
-#   - Example 4: safe_name("???")                        -> "___"   *** NOT "file" ***
-#     ('?' -> '_' three times, then strip(" .") leaves "___" which is truthy; the fallback only
-#     triggers on emptiness, and underscores are not stripped. The older header comment claiming
-#     "file" is wrong - verified.)
-#   - Example 5: safe_name("valid_filename.py")          -> "valid_filename.py" (no changes)
-#   - Example 6: safe_name("My Secret Script v1!.sh")    -> "My Secret Script v1!.sh"
-#     *** NOT 'my_secret_script_v1_.sh' *** - the function does NOT lowercase and does NOT replace
-#     spaces or '!'. Uppercase, spaces, and '!' all survive verbatim. Only the 16 forbidden chars
-#     become underscores.
-#   - Example 7: safe_name("../secret")                  -> "_secret"
-#     ('/'-s replaced, leading dot stripped, leading '_' remains truthy)
-#   - Example 8: safe_name("a\tb\nc.py")                 -> "a_b_c.py" (control chars -> '_')
-#   - Example 9: safe_name("")                           -> "file"
-#   - Example 10: safe_name("/")                         -> "_"      ('/' -> '_', not stripped)
-#   - Example 11: safe_name("a.b.")                      -> "a.b"    (trailing dot stripped)
-#   - Example 12: safe_name("file<>.txt")                -> "file__.txt"
-#   - Example 13: safe_name("  spaced name .sh ")        -> "spaced name .sh"  (space kept interior,
-#     leading spaces + trailing space & dot stripped)
-#   - Example 14: safe_name("unicodéλ.py")              -> "unicodéλ.py"  (unicode preserved)
-#   - Example 15: very long names: NOT truncated; returned in full.
+# Edge Cases & Errors:
+#   - String becomes empty after stripping dots/spaces (e.g. "...", "  "): Evaluates as falsy, triggering the fallback string "file".
+#   - String contains only forbidden chars ("///"): Replaced by underscores ("___") which remain truthy, so "___" is returned.
 #
-# ============================================================================
-# BOUNDARY VALUES SUMMARY
-# ============================================================================
-#   empty string / whitespace-only -> "file"          (strip -> "" -> fallback)
-#   dots-only ("." , "..", "...") -> "file"           (stripped to "" -> fallback)
-#   all-forbidden strings ("///", ":::", "?*|") -> "___"/"___"/"___" style, NOT "file" (each
-#     becomes '_'-runs which survive strip).
-#   strings with only spaces and int==0 -> "file"; " _ " -> "_" (space-led underscore survives).
-#   Windows paths ("C:\\x\\y") -> "C__x_y" (backslashes + colons eaten).
-#   NOTE: '__' double-underscores are NOT collapsed; "a::b" -> "a__b".
-#
-# ============================================================================
-# CONSUMERS & DOWNSTREAM EFFECTS
-# ============================================================================
-#   - export_session_bundles: folder names (safe_name(display_title)) and EVERY relative path
-#     component of exported scripts (join of safe_name per segment, or safe_name(basename) when
-#     preserving paths is off). When a component sanitizes to exactly "file", the exporter
-#     substitutes f"script_{i}.txt" so nothing is lost.
-#   - GUI export dialog handlers use safe_name for output folder names.
-#
-# DOC-HISTORY CORRECTIONS (upstream examples vs verified reality):
-#   - safe_name("  my*script?.py  ") -> "my_script_.py"   (upstream: correct)
-#   - safe_name("...") -> "file"                              (upstream: correct)
-#   - safe_name("???") -> "___"  (NOT "file" - upstream comment was inaccurate)
+# How to Test:
+#   - Run: python3 -c 'from opencode_extractor.utils.safe_name import safe_name; print(safe_name("feat/session:1"))' (outputs "feat_session_1")
+#   - Run: python3 -c 'from opencode_extractor.utils.safe_name import safe_name; print(safe_name("..."))' (outputs "file")
+
+# Function declaration: Takes input string and returns sanitized string safe for file names
 def safe_name(name: str) -> str:
+    # Line explanation: Uses regular expression substitution to replace every occurrence of any forbidden character (slashes, colons, quotes, control chars) with an underscore '_'.
+    # Options & Replacement: All forbidden chars [/\\:*?\"<>|\x00-\x1f] become '_'. Unmatched characters (letters, numbers, spaces, dots, underscores) are left unchanged.
+    # Output: Replaced string assigned back to local variable 'name'.
     name = re.sub(r"[/\\:*?\"<>|\x00-\x1f]", "_", name)
+    
+    # Line explanation: Strips leading and trailing space and dot characters (.strip(" .")), and if the resulting string is empty, returns the default fallback string "file".
+    # Options / Fallback: If stripping leaves "", returns "file". Otherwise returns the stripped sanitized string.
+    # Output: Final sanitized filename string.
     return name.strip(" .") or "file"
