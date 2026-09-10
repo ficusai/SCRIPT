@@ -1,3 +1,8 @@
+# Module note: Load Sessions Asynchronously Handler.
+# Purpose: Launches background ScanWorker thread to scan databases without freezing the GUI.
+# Plain-language overexplanation for beginners:
+# When the user opens the application or clicks Refresh, this handler starts a background worker thread to read session data from database files so the window remains smooth and responsive.
+
 from gui.workers.scan_worker import ScanWorker
 from gui.handlers.on_sessions_loaded import on_sessions_loaded
 from gui.handlers.on_scan_error import on_scan_error
