@@ -1,6 +1,14 @@
 """
 CLI entry point for running opencode_extractor as a module (python -m opencode_extractor).
 This file lets users run the extractor directly from the terminal prompt using the python command.
+
+Structured Architecture Notes & Compatibility Matrix:
+- Code Extensions Supported: .py (Python package entry point execution script)
+- Formats Handled: Command-line arguments via standard sys.argv array
+- Export Modes Supported: CLI module execution dispatch mode (`python3 -m opencode_extractor`)
+- Framework Possibilities:
+    - CLI: Direct terminal invocation interface
+    - Environment Bootstrap: Automatically appends repository root to sys.path to ensure module imports succeed regardless of working directory
 """
 
 import sys
@@ -78,13 +86,21 @@ from pathlib import Path
 #
 # SAMPLE TEST EXTENSIONS HANDLED:
 #   - .py, .sh, .bash, .js, .ts
+
+# Compute absolute path to repository root folder (two directory levels up from __main__.py)
+# Variable Type: pathlib.Path
 root_dir = Path(__file__).resolve().parent.parent
+
+# Add root directory to sys.path if not already present to ensure opencode_extractor can be imported
+# Condition: `str(root_dir) not in sys.path` prevents duplicate path entries
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
 # Import the main command-line entry function.
+# Function signature: main() -> None
 from opencode_extractor.cli.main import main
 
 # Checks if this script is being executed directly by the user, and if so, runs the main application function.
+# Condition: `__name__ == "__main__"` is True only when executed via CLI (`python3 -m opencode_extractor`)
 if __name__ == "__main__":
     main()
