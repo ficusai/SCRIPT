@@ -42,12 +42,17 @@ from opencode_extractor.models.database_source import DatabaseSource
 #    - Root JSON is a string like '"hello"': isinstance(obj, dict) is False, entry skipped
 #    - Duplicate (sid, obj) pairs CAN appear if the same session exists in multiple database sources
 #
-#  How to test:
-#    - Test with valid JSON string: should return parsed dict
-#    - Test with invalid JSON string: should skip that entry
-#    - Test with JSON array root: should skip (not a dict)
-#    - Test with None data: should skip
-# )
+#  Data Integrity Considerations:
+#    - SQLite NULL columns become Python None, which json.loads() rejects with TypeError
+#    - JSON number types: integers may exceed Python int range (SQLite stores as REAL -> float precision loss)
+#    - JSON boolean null maps to Python None; indistinguishable from explicit null in JSON
+#    - Unicode handling: json.loads() uses UTF-8; surrogate pairs in source data may cause decode errors
+#    - Deep nesting: JSON with >1000 levels may hit Python's recursion limit (RecursionError caught by broad except)
+#    - Type stability: parsed dicts preserve original JSON types (str, int, float, bool, None, list, dict)
+#    - No schema validation: parsed dicts are passed through; missing expected keys cause KeyError downstream
+# (Data Note: JSON part parser. This is a filter function — it never raises, always skipping invalid entries.
+#  The returned list may contain duplicate session IDs if multiple database sources are queried.
+#  Downstream code must handle missing keys gracefully since no schema validation is performed here.)
 def parse_part_json(
     # (Parameter note: List of DatabaseSource objects specifying which databases/text dumps to read from.
     #  Each source has kind ("sqlite" or "text_dump"), path, label, and size_mb.
