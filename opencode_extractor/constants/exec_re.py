@@ -24,9 +24,10 @@ import re
 #       * node is the JavaScript runtime
 #       * ruby and perl are scripting language interpreters
 #   \s+         -> one or more whitespace chars separating interpreter from arguments
-#   (?:\-[a-zA-Z]+\s+)*  -> NON-CAPTURING zero-or-more group for single-letter flags:
-#       * Matches patterns like "-u ", "-x ", "-e " (flag + required space)
-#       * The * allows zero flags (e.g., "python3 main.py" with no flags)
+#   (?:\-\-?[a-zA-Z0-9_][a-zA-Z0-9_-]*(?:\=[^\s'\"]+)?\s+)*  -> NON-CAPTURING group for flags:
+#       * Requires first char after dash(es) to be non-hyphen [a-zA-Z0-9_] to prevent ReDoS backtracking
+#       * Matches single and double dash flags (e.g. "-u ", "--trace-warnings ", "--foo=bar ")
+#       * The * allows zero or more flags (e.g., "python3 main.py" with no flags)
 #   ['\"]?     -> optional opening quote around script path (not required)
 #   ([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))  -> CAPTURE GROUP 1:
 #       * [^\s'\"|&><;]+ = one or more chars that are NOT whitespace, quotes, or shell operators
@@ -49,6 +50,6 @@ import re
 #   - vim main.py (vim is not a recognized interpreter)
 #   - echo hello (no script file involved)
 EXEC_RE = re.compile(
-    r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-\-?[a-zA-Z0-9_-]+(?:\=[^\s'\"]+)?\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
+    r"""(?:python3?|bash|sh|zsh|node|ruby|perl)\s+(?:\-\-?[a-zA-Z0-9_][a-zA-Z0-9_-]*(?:\=[^\s'\"]+)?\s+)*['\"]?([^\s'\"|&><;]+\.(?:py|sh|bash|js|ts|rb|pl|lua|php|pyw))['\"]?""",
     re.I,
 )
