@@ -8,6 +8,16 @@ A desktop application and Python library for extracting scripts, tool calls, and
 
 **GitHub:** https://github.com/ficusai/SCRIPT
 
+## Supported Operating Systems
+
+| Operating System | Supported |
+| :--- | :---: |
+| LINUX | ✅ |
+| WINDOWS | ✅ |
+| MACOS | ✅ |
+| ANDROID | ❌ |
+| IOS | ❌ |
+
 ## Primary Use Cases
 
 1. **Extract AI Coding Sessions** — Pull structured data (scripts, tool calls, transcripts) from OpenCode AI assistant databases for archiving, analysis, or reuse
