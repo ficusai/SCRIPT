@@ -179,9 +179,19 @@ python3 -m py_compile opencode_extractor/**/*.py gui/**/*.py
 ## 🌿 Git & Release Branching
 
 * **Active Release Branch**: `SCRIPT-0.1v-linux-native`
+* **Feature Branch**: `feature/minimal-multitab-gui`
 * **Remote Origin**: `https://github.com/ficusai/SCRIPT.git`
 
 All commits within this repository maintain strict local directory boundary isolation and follow standardized release branch naming (`<PROJECT>-0.1v-linux-native`).
+
+### Branch-Related File Changes (`feature/minimal-multitab-gui`)
+* `gui/main_window.py`: Re-architected MainWindow container to construct central `QTabWidget` with 4 minimal tabs.
+* `gui/components/build_header_bar.py`: Refactored header bar to focus on title banner, global database source dropdown, and manual refresh button.
+* `gui/components/build_sessions_tab.py`: Created Tab 1 builder (`🗂️ Sessions & History`) containing search input, status filters, session counter, table grid, and quick tab navigation buttons.
+* `gui/components/build_code_inspector_tab.py`: Created Tab 2 builder (`💻 Code & Scripts`) containing checkable script files list and 75% width monospace code preview editor.
+* `gui/components/build_export_hub_tab.py`: Created Tab 3 builder (`📦 Export Hub`) organizing artifact checkboxes, packaging structures, and export action button into card group boxes.
+* `gui/components/build_sources_tab.py`: Created Tab 4 builder (`🔍 Database Sources`) integrating database path inputs, system auto-discovery worker, and double-click database switching.
+* `gui/components/__init__.py`: Exported new tab component builder functions for application assembly.
 
 ---
 

@@ -38,13 +38,13 @@
 #   - deselect_all_btn.clicked -> deselect_all_scripts
 #   - export_btn.clicked -> export_selected_sessions_dialog
 
-# Line note: Import header bar builder (title label, 260px DB dropdown, 240px search box, filter dropdown, refresh button).
 from .build_header_bar import build_header_bar
-# Line note: Import session table panel builder (5-column QTableWidget, 110px status column, stretch title column, selection buttons).
 from .build_session_table import build_session_table
-# Line note: Import script preview panel builder (QSplitter with 260px list and 360px preview, monospace font QTextEdit).
 from .build_script_preview_panel import build_script_preview_panel
-# Line note: Import export settings bar builder (6 export configuration checkboxes, accent-styled #exportButton).
 from .build_export_settings_bar import build_export_settings_bar
-# Line note: Import status footer layout builder (status text label, 200px QProgressBar).
 from .build_status_footer import build_status_footer
+from .build_sessions_tab import build_sessions_tab
+from .build_code_inspector_tab import build_code_inspector_tab
+from .build_export_hub_tab import build_export_hub_tab
+from .build_sources_tab import build_sources_tab
+
